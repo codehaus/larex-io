@@ -21,33 +21,16 @@ import java.nio.ByteBuffer;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class EchoAsyncInterpreter implements AsyncInterpreter
+public class EchoAsyncInterpreter extends AbstractAsyncInterpreter
 {
-    private final ByteBuffer readBuffer = ByteBuffer.allocate(512);
-    private final ByteBuffer writeBuffer = ByteBuffer.allocate(512);
-    private final AsyncCoordinator coordinator;
-
     public EchoAsyncInterpreter(AsyncCoordinator coordinator)
     {
-        this.coordinator = coordinator;
+        super(coordinator);
     }
 
-    public ByteBuffer getReadBuffer()
+    @Override
+    protected void read(ByteBuffer buffer)
     {
-        return readBuffer;
-    }
-
-    public ByteBuffer getWriteBuffer()
-    {
-        return writeBuffer;
-    }
-
-    public void readFrom(ByteBuffer buffer)
-    {
-        ByteBuffer writeBuffer = ByteBuffer.allocate(buffer.remaining());
-        writeBuffer.put(buffer);
-        writeBuffer.flip();
-        coordinator.writeFrom(writeBuffer);
-        coordinator.needsRead(true);
+        write(buffer);
     }
 }

@@ -14,12 +14,23 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io.connector;
+
+import java.net.InetSocketAddress;
+import java.nio.channels.SocketChannel;
+
+import org.codehaus.larex.io.RuntimeSocketConnectException;
 
 /**
+ * Responsibility: to create and operate on {@link SocketChannel}s.
+ *
  * @version $Revision: 903 $ $Date$
  */
-public interface AsyncConnectorListener
+public interface ClientConnector
 {
-    AsyncInterpreter connected(AsyncCoordinator coordinator);
+    public void connect(InetSocketAddress address) throws RuntimeSocketConnectException;
+
+    public void close();
+
+    boolean awaitClosed(long timeout) throws InterruptedException;
 }

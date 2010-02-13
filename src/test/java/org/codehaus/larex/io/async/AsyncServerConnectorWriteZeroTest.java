@@ -24,12 +24,16 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -44,21 +48,11 @@ public class AsyncServerConnectorWriteZeroTest
         ExecutorService threadPool = Executors.newCachedThreadPool();
         try
         {
-            AsyncConnectorListener listener = new AsyncConnectorListener()
+            AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
             {
-                public AsyncInterpreter connected(final AsyncCoordinator coordinator)
+                public AsyncInterpreter newAsyncInterpreter(final AsyncCoordinator coordinator)
                 {
-                    return new EchoAsyncInterpreter(coordinator)
-                    {
-                        public void readFrom(ByteBuffer buffer)
-                        {
-                            // Read and echo back
-                            ByteBuffer writeBuffer = ByteBuffer.allocate(buffer.capacity());
-                            writeBuffer.put(buffer);
-                            writeBuffer.flip();
-                            coordinator.writeFrom(writeBuffer);
-                        }
-                    };
+                    return new EchoAsyncInterpreter(coordinator);
                 }
             };
 
@@ -68,12 +62,12 @@ public class AsyncServerConnectorWriteZeroTest
             InetAddress loopback = InetAddress.getByName(null);
             InetSocketAddress address = new InetSocketAddress(loopback, 0);
 
-            StandardAsyncServerConnector serverConnector = new StandardAsyncServerConnector(address, listener, threadPool)
+            StandardAsyncServerConnector serverConnector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers())
             {
                 @Override
-                protected AsyncEndpoint newEndpoint(SocketChannel channel, AsyncCoordinator coordinator)
+                protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
                 {
-                    return new StandardAsyncEndpoint(channel, coordinator)
+                    return new StandardAsyncChannel(channel, coordinator, byteBuffers)
                     {
                         private final AtomicInteger writes = new AtomicInteger();
 
@@ -104,15 +98,15 @@ public class AsyncServerConnectorWriteZeroTest
                 }
 
                 @Override
-                protected AsyncCoordinator newCoordinator()
+                protected AsyncCoordinator newCoordinator(AsyncSelector selector, Executor threadPool)
                 {
-                    return new StandardAsyncCoordinator(getSelector(), getThreadPool())
+                    return new StandardAsyncCoordinator(selector, threadPool)
                     {
                         @Override
-                        public void writeFrom(ByteBuffer buffer) throws RuntimeSocketClosedException
+                        public void write(ByteBuffer buffer) throws RuntimeSocketClosedException
                         {
                             writes.incrementAndGet();
-                            super.writeFrom(buffer);
+                            super.write(buffer);
                         }
 
                         @Override

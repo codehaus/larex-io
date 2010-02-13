@@ -21,25 +21,30 @@ import java.nio.ByteBuffer;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
 
 /**
- * <p>{@link AsyncCoordinator} coordinates the activity between the {@link AsyncEndpoint},
- * the {@link AsyncInterpreter} and the {@link SelectorManager}.</p>
- * <p>{@link AsyncCoordinator} receives I/O events from the {@link SelectorManager}, and
- * dispatches them appropriately to either the {@link AsyncEndpoint} or the {@link AsyncInterpreter}.</p>
+ * <p>{@link AsyncCoordinator} coordinates the activity between the {@link AsyncChannel},
+ * the {@link AsyncInterpreter} and the {@link AsyncSelector}.</p>
+ * <p>{@link AsyncCoordinator} receives I/O events from the {@link AsyncSelector}, and
+ * dispatches them appropriately to either the {@link AsyncChannel} or the {@link AsyncInterpreter}.</p>
  * <p/>
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface AsyncCoordinator extends SelectorManager.Listener
+public interface AsyncCoordinator extends AsyncSelector.Listener
 {
     /**
-     * @param endpoint the endpoint associated with this coordinator
+     * @param channel the channel associated with this coordinator
      */
-    public void setEndpoint(AsyncEndpoint endpoint);
+    public void setAsyncChannel(AsyncChannel channel);
 
     /**
      * @param interpreter the interpreter associated with this coordinator
      */
-    public void setInterpreter(AsyncInterpreter interpreter);
+    public void setAsyncInterpreter(AsyncInterpreter interpreter);
+
+    /**
+     * @param size the size of the read buffer
+     */
+    public void setReadBufferSize(int size);
 
     /**
      * <p>Asks the I/O system to register (if {@code needsRead} is true) or
@@ -55,7 +60,7 @@ public interface AsyncCoordinator extends SelectorManager.Listener
     /**
      * <p>Asks the I/O system to register (if {@code needsWrite} is true) or
      * to deregister (if {@code needsWrite} is false) for interest in write events.</p>
-     * <p>Normally, an endpoint will call this method when it detects that it cannot
+     * <p>Normally, a channel will call this method when it detects that it cannot
      * write more bytes to the I/O system.</p>
      *
      * @param needsWrite true to indicate that there is interest in receiving read events,
@@ -65,27 +70,29 @@ public interface AsyncCoordinator extends SelectorManager.Listener
 
     /**
      * <p>Reads bytes from the given {@code buffer}.</p>
-     * <p>Normally, an endpoint will call this method after it read bytes from the I/O system,
+     * <p>Normally, a channel will call this method after it read bytes from the I/O system,
      * and this coordinator will forward the method call to the interpreter.</p>
      *
      * @param buffer the buffer to read bytes from
-     * @see AsyncInterpreter#readFrom(ByteBuffer)
+     * @see AsyncInterpreter#onRead(ByteBuffer)
      */
-    public void readFrom(ByteBuffer buffer);
+    public void onRead(ByteBuffer buffer);
 
     /**
      * <p>Writes bytes from the given {@code buffer}.</p>
      * <p>Normally, an interpreter will call this method after it filled the buffer with bytes
-     * to write, and this coordinator will forward the call to the endpoint.</p>
+     * to write, and this coordinator will forward the call to the channel.</p>
      * @param buffer the buffer to write bytes from
-     * @throws RuntimeSocketClosedException if the associated endpoint has been closed
-     * @see AsyncEndpoint#write(ByteBuffer)
+     * @throws RuntimeSocketClosedException if the associated channel has been closed
+     * @see AsyncChannel#write(ByteBuffer)
      */
-    public void writeFrom(ByteBuffer buffer) throws RuntimeSocketClosedException;
+    public void write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 
     /**
-     * <p>Closes this coordinator and the associated endpoint.</p>
-     * @see AsyncEndpoint#close()
+     * <p>Closes this coordinator and the associated channel.</p>
+     * @see AsyncChannel#close()
      */
     public void close();
+
+    public void onClose();
 }

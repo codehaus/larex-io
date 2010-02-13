@@ -24,11 +24,8 @@ import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
@@ -38,23 +35,35 @@ import org.slf4j.LoggerFactory;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class ReadWriteSelectorManager implements SelectorManager
+public class ReadWriteAsyncSelector implements AsyncSelector
 {
+    private static final AtomicInteger ids = new AtomicInteger();
+
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final Queue<Runnable> tasks = new ConcurrentLinkedQueue<Runnable>();
-    private final Lock closeLock = new ReentrantLock();
-    private final Condition closeCondition = closeLock.newCondition();
     private final Selector selector;
-    private volatile State state = State.CLOSE;
-    private volatile Thread thread;
+    private final Thread thread;
 
-    public ReadWriteSelectorManager(Executor threadPool)
+    public ReadWriteAsyncSelector()
+    {
+        this(new ThreadFactory()
+        {
+            public Thread newThread(Runnable r)
+            {
+                Thread thread = new Thread(r);
+                thread.setName(AsyncSelector.class.getSimpleName() + "-" + ids.incrementAndGet());
+                return thread;
+            }
+        });
+    }
+
+    public ReadWriteAsyncSelector(ThreadFactory threadFactory)
     {
         try
         {
             this.selector = Selector.open();
-            this.state = State.OPEN;
-            threadPool.execute(new SelectorLoop());
+            this.thread = threadFactory.newThread(new SelectorLoop());
+            this.thread.start();
         }
         catch (IOException x)
         {
@@ -62,15 +71,15 @@ public class ReadWriteSelectorManager implements SelectorManager
         }
     }
 
-    public void register(AsyncEndpoint endpoint, Listener listener)
+    public void register(AsyncChannel channel, Listener listener)
     {
-        tasks.add(new Register(selector, endpoint, listener));
+        tasks.add(new Register(selector, channel, listener));
         wakeup();
     }
 
-    public void update(AsyncEndpoint endpoint, int operations, boolean add)
+    public void update(AsyncChannel channel, int operations, boolean add)
     {
-        Update task = new Update(endpoint, operations, add);
+        Update task = new Update(channel, operations, add);
         if (Thread.currentThread() == thread)
         {
             task.run();
@@ -93,26 +102,10 @@ public class ReadWriteSelectorManager implements SelectorManager
         wakeup();
     }
 
-    public boolean awaitClosed(long timeout) throws InterruptedException
+    public boolean join(long timeout) throws InterruptedException
     {
-        long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
-        final Lock closeLock = this.closeLock;
-        closeLock.lock();
-        try
-        {
-            while (true)
-            {
-                if (state == State.CLOSE)
-                    return true;
-                if (nanos <= 0)
-                    return false;
-                nanos = closeCondition.awaitNanos(nanos);
-            }
-        }
-        finally
-        {
-            closeLock.unlock();
-        }
+        thread.join(timeout);
+        return !thread.isAlive();
     }
 
     protected void processTasks()
@@ -142,13 +135,13 @@ public class ReadWriteSelectorManager implements SelectorManager
     private class Register implements Runnable
     {
         private final Selector selector;
-        private final AsyncEndpoint endpoint;
+        private final AsyncChannel channel;
         private final Listener listener;
 
-        private Register(Selector selector, AsyncEndpoint endpoint, Listener listener)
+        private Register(Selector selector, AsyncChannel channel, Listener listener)
         {
             this.selector = selector;
-            this.endpoint = endpoint;
+            this.channel = channel;
             this.listener = listener;
         }
 
@@ -156,24 +149,25 @@ public class ReadWriteSelectorManager implements SelectorManager
         {
             try
             {
-                endpoint.register(selector, listener);
+                channel.register(selector, listener);
+                listener.open();
             }
             catch (RuntimeSocketClosedException x)
             {
-                logger.debug("Ignoring registration for closed listener {}", listener);
+                logger.debug("Ignoring registration of listener {} for closed channel {}", listener, channel);
             }
         }
     }
 
     private class Update implements Runnable
     {
-        private final AsyncEndpoint endpoint;
+        private final AsyncChannel channel;
         private final int operations;
         private final boolean add;
 
-        public Update(AsyncEndpoint endpoint, int operations, boolean add)
+        public Update(AsyncChannel channel, int operations, boolean add)
         {
-            this.endpoint = endpoint;
+            this.channel = channel;
             this.operations = operations;
             this.add = add;
         }
@@ -182,11 +176,11 @@ public class ReadWriteSelectorManager implements SelectorManager
         {
             try
             {
-                endpoint.update(operations, add);
+                channel.update(operations, add);
             }
             catch (RuntimeSocketClosedException x)
             {
-                logger.debug("Ignoring update for closed endpoint {}", endpoint);
+                logger.debug("Ignoring update for closed channel {}", channel);
             }
         }
     }
@@ -218,8 +212,6 @@ public class ReadWriteSelectorManager implements SelectorManager
         {
             try
             {
-                state = State.SELECT;
-                thread = Thread.currentThread();
                 logger.debug("Selector loop entered");
 
                 while (selector.isOpen())
@@ -268,24 +260,8 @@ public class ReadWriteSelectorManager implements SelectorManager
             }
             finally
             {
-                state = State.CLOSE;
-                closeLock.lock();
-                try
-                {
-                    closeCondition.signalAll();
-                }
-                finally
-                {
-                    closeLock.unlock();
-                }
                 logger.info("Selector loop exited");
             }
         }
-    }
-
-
-    private enum State
-    {
-        OPEN, SELECT, CLOSE
     }
 }

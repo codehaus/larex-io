@@ -16,18 +16,14 @@
 
 package org.codehaus.larex.io;
 
-import java.nio.channels.ServerSocketChannel;
+import java.nio.ByteBuffer;
 
 /**
- * Responsibility: to create and operate on {@link ServerSocketChannel}s.
- *
- * @version $Revision: 903 $ $Date$
+ * @version $Revision$ $Date$
  */
-public interface ServerConnector
+public interface ByteBuffers
 {
-    public int listen();
+    ByteBuffer acquire(int size, boolean direct);
 
-    public void close();
-
-    boolean awaitClosed(long timeout) throws InterruptedException;
+    void release(ByteBuffer buffer);
 }

@@ -25,31 +25,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * // TODO: implement read and write timeouts, between needs[Read|Write]() and [read|write]Ready()
+ * // TODO: not quite: need to throw exceptions in the calling thread (for write at least)
  * @version $Revision: 903 $ $Date$
  */
 public class StandardAsyncCoordinator implements AsyncCoordinator
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final SelectorManager selector;
+    private final AsyncSelector selector;
     private final Executor threadPool;
     private final Runnable reader = new Reader();
-    private volatile AsyncEndpoint endpoint;
+    private volatile AsyncChannel channel;
     private volatile AsyncInterpreter interpreter;
+    private volatile int readBufferSize = 1024;
 
-    public StandardAsyncCoordinator(SelectorManager selector, Executor threadPool)
+    public StandardAsyncCoordinator(AsyncSelector selector, Executor threadPool)
     {
         this.selector = selector;
         this.threadPool = threadPool;
     }
 
-    public void setEndpoint(AsyncEndpoint endpoint)
+    public void setAsyncChannel(AsyncChannel channel)
     {
-        this.endpoint = endpoint;
+        this.channel = channel;
     }
 
-    public void setInterpreter(AsyncInterpreter interpreter)
+    public void setAsyncInterpreter(AsyncInterpreter interpreter)
     {
         this.interpreter = interpreter;
+    }
+
+    public void setReadBufferSize(int size)
+    {
+        this.readBufferSize = size;
+    }
+
+    public void open()
+    {
+        interpreter.onOpen();
     }
 
     public void readReady()
@@ -67,32 +80,37 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
-        endpoint.writeReady();
+        channel.writeReady();
     }
 
     public void needsRead(boolean needsRead)
     {
-        selector.update(endpoint, SelectionKey.OP_READ, needsRead);
+        selector.update(channel, SelectionKey.OP_READ, needsRead);
     }
 
     public void needsWrite(boolean needsWrite)
     {
-        selector.update(endpoint, SelectionKey.OP_WRITE, needsWrite);
+        selector.update(channel, SelectionKey.OP_WRITE, needsWrite);
     }
 
-    public void readFrom(ByteBuffer buffer)
+    public void onRead(ByteBuffer buffer)
     {
-        interpreter.readFrom(buffer);
+        interpreter.onRead(buffer);
     }
 
-    public void writeFrom(ByteBuffer buffer) throws RuntimeSocketClosedException
+    public void write(ByteBuffer buffer) throws RuntimeSocketClosedException
     {
-        endpoint.write(buffer);
+        channel.write(buffer);
     }
 
     public void close()
     {
-        endpoint.close();
+        channel.close();
+    }
+
+    public void onClose()
+    {
+        interpreter.onClose();
     }
 
     private class Reader implements Runnable
@@ -101,11 +119,11 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
         {
             try
             {
-                endpoint.readInto(interpreter.getReadBuffer());
+                channel.read(readBufferSize);
             }
             catch (RuntimeSocketClosedException x)
             {
-                logger.debug("Could not read, endpoint has been closed");
+                logger.debug("Could not read, channel has been closed");
             }
         }
     }

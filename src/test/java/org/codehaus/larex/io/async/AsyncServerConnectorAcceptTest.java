@@ -25,8 +25,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.codehaus.larex.io.ServerConnector;
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.connector.ServerConnector;
+import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -34,44 +38,50 @@ import org.junit.Test;
  */
 public class AsyncServerConnectorAcceptTest
 {
+    private ExecutorService threadPool;
+
+    @Before
+    public void initThreadPool()
+    {
+        threadPool = Executors.newCachedThreadPool();
+    }
+
+    @After
+    public void shutdownThreadPool()
+    {
+        threadPool.shutdown();
+    }
+
     @Test
     public void testBlockingAccept() throws Exception
     {
-        ExecutorService threadPool = Executors.newCachedThreadPool();
+        InetSocketAddress address = new InetSocketAddress("localhost", 0);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        ServerConnector serverConnector = new StandardAsyncServerConnector(address, null, threadPool, new ThreadLocalByteBuffers())
+        {
+            @Override
+            protected void accepted(SocketChannel channel) throws IOException
+            {
+                latch.countDown();
+            }
+        };
+        int port = serverConnector.listen();
         try
         {
-            InetSocketAddress address = new InetSocketAddress("localhost", 0);
-
-            final CountDownLatch latch = new CountDownLatch(1);
-            ServerConnector serverConnector = new StandardAsyncServerConnector(address, null, threadPool)
-            {
-                @Override
-                protected void accepted(SocketChannel channel) throws IOException
-                {
-                    latch.countDown();
-                }
-            };
-            int port = serverConnector.listen();
+            Socket socket = new Socket(address.getHostName(), port);
             try
             {
-                Socket socket = new Socket(address.getHostName(), port);
-                try
-                {
-                    Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
-                }
-                finally
-                {
-                    socket.close();
-                }
+                Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
             }
             finally
             {
-                serverConnector.close();
+                socket.close();
             }
         }
         finally
         {
-            threadPool.shutdown();
+            serverConnector.close();
         }
     }
 }

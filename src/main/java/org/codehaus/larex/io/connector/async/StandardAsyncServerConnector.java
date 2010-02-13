@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io.connector.async;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -23,38 +23,62 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.ServerConnector;
+import org.codehaus.larex.io.async.AsyncChannel;
+import org.codehaus.larex.io.async.AsyncCoordinator;
+import org.codehaus.larex.io.async.AsyncInterpreter;
+import org.codehaus.larex.io.async.AsyncInterpreterFactory;
+import org.codehaus.larex.io.async.AsyncSelector;
+import org.codehaus.larex.io.async.ReadWriteAsyncSelector;
+import org.codehaus.larex.io.async.StandardAsyncChannel;
+import org.codehaus.larex.io.async.StandardAsyncCoordinator;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * // TODO: adding the number of selectors will move us towards a "connection" abstraction
  * @version $Revision: 903 $ $Date$
  */
 public class StandardAsyncServerConnector implements ServerConnector
 {
-    private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final Lock closeLock = new ReentrantLock();
-    private final Condition closeCondition = closeLock.newCondition();
-    private final InetSocketAddress address;
-    private final AsyncConnectorListener listener;
-    private final Executor threadPool;
-    private Boolean reuseAddress;
-    private Integer backlogSize;
-    private volatile ServerSocketChannel serverChannel;
-    private volatile SelectorManager selector;
-    private volatile State state = State.CLOSED;
+    private static final AtomicInteger ids = new AtomicInteger();
 
-    public StandardAsyncServerConnector(InetSocketAddress address, AsyncConnectorListener listener, Executor threadPool)
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+    private final InetSocketAddress address;
+    private final AsyncInterpreterFactory interpreterFactory;
+    private final Executor threadPool;
+    private final ByteBuffers byteBuffers;
+    private final AsyncSelector[] selectors;
+    private final AtomicInteger selector = new AtomicInteger();
+    private volatile Boolean reuseAddress;
+    private volatile Integer backlogSize;
+    private volatile Thread acceptorThread;
+    private volatile ServerSocketChannel serverChannel;
+
+    public StandardAsyncServerConnector(InetSocketAddress address, AsyncInterpreterFactory interpreterFactory, Executor threadPool, ByteBuffers byteBuffers)
+    {
+        this(address, interpreterFactory, threadPool, byteBuffers, 1);
+    }
+    public StandardAsyncServerConnector(InetSocketAddress address, AsyncInterpreterFactory interpreterFactory, Executor threadPool, ByteBuffers byteBuffers, int selectors)
     {
         this.address = address;
-        this.listener = listener;
+        this.interpreterFactory = interpreterFactory;
         this.threadPool = threadPool;
+        this.byteBuffers = byteBuffers;
+        if (selectors < 1)
+            throw new IllegalArgumentException("Invalid selectors count " + selectors + ": must be >= 1");
+        this.selectors = new AsyncSelector[selectors];
+        for (int i = 0; i < selectors; ++i)
+            this.selectors[i] = newAsyncSelector();
+    }
+
+    public Boolean isReuseAddress()
+    {
+        return reuseAddress;
     }
 
     public void setReuseAddress(boolean reuseAddress)
@@ -62,43 +86,40 @@ public class StandardAsyncServerConnector implements ServerConnector
         this.reuseAddress = reuseAddress;
     }
 
+    public Integer getBacklogSize()
+    {
+        return backlogSize;
+    }
+
     public void setBacklogSize(int backlogSize)
     {
         this.backlogSize = backlogSize;
     }
 
-    protected Executor getThreadPool()
-    {
-        return threadPool;
-    }
-
-    protected SelectorManager getSelector()
-    {
-        return selector;
-    }
-
     public int listen() throws RuntimeIOException
     {
-        state = State.OPEN;
-
         initializeDefaults();
 
         try
         {
             serverChannel = ServerSocketChannel.open();
             serverChannel.configureBlocking(true);
-            serverChannel.socket().setReuseAddress(reuseAddress);
-            serverChannel.socket().bind(address, backlogSize);
+            serverChannel.socket().setReuseAddress(isReuseAddress());
+            serverChannel.socket().bind(address, getBacklogSize());
         }
         catch (IOException x)
         {
             throw new RuntimeIOException(x);
         }
 
-        selector = new ReadWriteSelectorManager(threadPool);
-        threadPool.execute(new AcceptWorker());
+        threadPool.execute(new Acceptor()); // TODO: use thread factory ?
 
         return serverChannel.socket().getLocalPort();
+    }
+
+    protected AsyncSelector newAsyncSelector()
+    {
+        return new ReadWriteAsyncSelector();
     }
 
     private void initializeDefaults()
@@ -117,7 +138,8 @@ public class StandardAsyncServerConnector implements ServerConnector
         logger.debug("ServerConnector {} closing", this);
         try
         {
-            selector.close();
+            for (AsyncSelector selector : selectors)
+                selector.close();
             serverChannel.close();
             logger.debug("ServerConnector {} closed", this);
         }
@@ -127,67 +149,54 @@ public class StandardAsyncServerConnector implements ServerConnector
         }
     }
 
-    public boolean awaitClosed(long timeout) throws InterruptedException
+    public boolean join(long timeout) throws InterruptedException
     {
-        selector.awaitClosed(timeout);
-
-        long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
-        final Lock closeLock = this.closeLock;
-        closeLock.lock();
-        try
-        {
-            while (true)
-            {
-                if (state == State.CLOSED)
-                    return true;
-                if (nanos <= 0)
-                    return false;
-                nanos = closeCondition.awaitNanos(nanos);
-            }
-        }
-        finally
-        {
-            closeLock.unlock();
-        }
+        acceptorThread.join(timeout);
+        return !acceptorThread.isAlive();
     }
 
     protected void accepted(SocketChannel channel) throws IOException
     {
         channel.configureBlocking(false);
 
-        AsyncCoordinator coordinator = newCoordinator();
+        // Pick a selector
+        int index = selector.incrementAndGet();
+        index = Math.abs(index % selectors.length);
+        AsyncSelector selector = selectors[index];
 
-        AsyncEndpoint endpoint = newEndpoint(channel, coordinator);
-        coordinator.setEndpoint(endpoint);
+        AsyncCoordinator coordinator = newCoordinator(selector, threadPool);
 
-        AsyncInterpreter interpreter = listener.connected(coordinator);
-        coordinator.setInterpreter(interpreter);
+        AsyncChannel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
+        coordinator.setAsyncChannel(asyncChannel);
 
-        register(endpoint, coordinator);
+        AsyncInterpreter interpreter = interpreterFactory.newAsyncInterpreter(coordinator);
+        coordinator.setAsyncInterpreter(interpreter);
+
+        register(selector, asyncChannel, coordinator);
     }
 
-    protected AsyncCoordinator newCoordinator()
+    protected AsyncCoordinator newCoordinator(AsyncSelector selector, Executor threadPool)
     {
-        return new StandardAsyncCoordinator(selector, getThreadPool());
+        return new StandardAsyncCoordinator(selector, threadPool);
     }
 
-    protected AsyncEndpoint newEndpoint(SocketChannel channel, AsyncCoordinator coordinator)
+    protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
     {
-        return new StandardAsyncEndpoint(channel, coordinator);
+        return new StandardAsyncChannel(channel, coordinator, byteBuffers);
     }
 
-    protected void register(AsyncEndpoint endpoint, AsyncCoordinator coordinator)
+    protected void register(AsyncSelector selector, AsyncChannel channel, AsyncCoordinator coordinator)
     {
-        selector.register(endpoint, coordinator);
+        selector.register(channel, coordinator);
     }
 
-    protected class AcceptWorker implements Runnable
+    protected class Acceptor implements Runnable
     {
         public void run()
         {
             try
             {
-                state = State.LISTEN;
+                acceptorThread = Thread.currentThread();
                 logger.info("ServerConnector {}, acceptor loop entered", this);
 
                 while (serverChannel.isOpen())
@@ -224,23 +233,8 @@ public class StandardAsyncServerConnector implements ServerConnector
             }
             finally
             {
-                state = State.CLOSED;
-                closeLock.lock();
-                try
-                {
-                    closeCondition.signalAll();
-                }
-                finally
-                {
-                    closeLock.unlock();
-                }
                 logger.info("ServerConnector {}, acceptor loop exited", this);
             }
         }
-    }
-
-    private enum State
-    {
-        OPEN, LISTEN, CLOSED
     }
 }

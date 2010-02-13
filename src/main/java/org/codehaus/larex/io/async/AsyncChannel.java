@@ -23,32 +23,32 @@ import java.nio.channels.Selector;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
 
 /**
- * <p>{@link AsyncEndpoint} hides the complexity of working with {@link SelectableChannel}s.</p>
+ * <p>{@link AsyncChannel} hides the complexity of working with {@link SelectableChannel}s.</p>
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface AsyncEndpoint
+public interface AsyncChannel
 {
     /**
-     * <p>Registers this endpoint with the given {@code selector} for read interest
+     * <p>Registers this channel with the given {@code selector} for read interest
      * and with the given {@code listener} as attachment.</p>
      *
-     * @param selector   the selector this endpoint's channel must register with
+     * @param selector   the selector this channel must register with
      * @param listener   the attachment to the registration
-     * @throws RuntimeSocketClosedException if this endpoint's channel has been closed
+     * @throws RuntimeSocketClosedException if this channel has been closed
      * @see SelectableChannel#register(Selector, int, Object)
      */
-    public void register(Selector selector, SelectorManager.Listener listener) throws RuntimeSocketClosedException;
+    public void register(Selector selector, AsyncSelector.Listener listener) throws RuntimeSocketClosedException;
 
     /**
-     * <p>Updates the endpoint's interests, adding (or removing) the given {@code operations}.</p>
+     * <p>Updates the channel's interests, adding (or removing) the given {@code operations}.</p>
      * @param operations the interest operations to add or remove
      * @param add whether to add or remove the operations
-     * @throws RuntimeSocketClosedException if this endpoint's channel selection key has been canceled
+     * @throws RuntimeSocketClosedException if this channel selection key has been canceled
      */
     public void update(int operations, boolean add) throws RuntimeSocketClosedException;
 
-    public void readInto(ByteBuffer buffer) throws RuntimeSocketClosedException;
+    public void read(int readBufferSize) throws RuntimeSocketClosedException;
 
     public void write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 

@@ -27,13 +27,14 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.codehaus.larex.io.ClientConnector;
+import org.codehaus.larex.io.CallerBlocksPolicy;
+import org.codehaus.larex.io.connector.StandardClientConnector;
 
 /**
  * @version $Revision: 13 $ $Date$
@@ -45,7 +46,7 @@ public class LoadClientMain
         new LoadClientMain().run();
     }
 
-    private final List<Connection> clients = new ArrayList<Connection>();
+    private final List<LatencyAsyncInterpreter> connections = new ArrayList<LatencyAsyncInterpreter>();
     private final AtomicLong start = new AtomicLong();
     private final AtomicLong end = new AtomicLong();
     private final AtomicLong responses = new AtomicLong();
@@ -57,7 +58,10 @@ public class LoadClientMain
 
     public void run() throws Exception
     {
-        ExecutorService threadPool = Executors.newCachedThreadPool();
+        int maxThreads = 500;
+        ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
+                new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
+        StandardClientConnector connector = new StandardClientConnector(threadPool);
 
         Random random = new Random();
 
@@ -75,7 +79,7 @@ public class LoadClientMain
             value = "8850";
         int port = Integer.parseInt(value);
 
-        int clients = 100;
+        int connections = 100;
         int batchCount = 1000;
         int batchSize = 5;
         long batchPause = 5;
@@ -85,43 +89,49 @@ public class LoadClientMain
         {
             System.err.println("-----");
 
-            System.err.print("clients [" + clients + "]: ");
+            System.err.print("connections [" + connections + "]: ");
             value = console.readLine();
             if (value == null)
                 break;
             value = value.trim();
             if (value.length() == 0)
-                value = "" + clients;
-            clients = Integer.parseInt(value);
+                value = "" + connections;
+            connections = Integer.parseInt(value);
 
-            System.err.println("Waiting for clients to be ready...");
+            System.err.println("Waiting for connections to be ready...");
 
+            AsyncInterpreterFactory<LatencyAsyncInterpreter> interpreterFactory = new AsyncInterpreterFactory<LatencyAsyncInterpreter>()
+            {
+                public LatencyAsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+                {
+                    return new LatencyAsyncInterpreter(coordinator);
+                }
+            };
             InetSocketAddress address = new InetSocketAddress(host, port);
 
-            // Create or remove the necessary clients
-            int currentClients = this.clients.size();
-            if (currentClients < clients)
+            // Create or remove the necessary connections
+            int currentConnections = this.connections.size();
+            if (currentConnections < connections)
             {
-                for (int i = 0; i < clients - currentClients; ++i)
+                for (int i = 0; i < connections - currentConnections; ++i)
                 {
-                    Connection connection = new Connection(threadPool);
-                    connection.connect(address);
-                    this.clients.add(connection);
+                    LatencyAsyncInterpreter connection = connector.newEndpoint(interpreterFactory).connect(address);
+                    this.connections.add(connection);
                 }
             }
-            else if (currentClients > clients)
+            else if (currentConnections > connections)
             {
-                for (int i = 0; i < currentClients - clients; ++i)
+                for (int i = 0; i < currentConnections - connections; ++i)
                 {
-                    Connection connection = this.clients.remove(currentClients - i - 1);
+                    LatencyAsyncInterpreter connection = this.connections.remove(currentConnections - i - 1);
                     connection.close();
                 }
             }
 
             System.err.println("Clients ready");
 
-            currentClients = this.clients.size();
-            if (currentClients > 0)
+            currentConnections = this.connections.size();
+            if (currentConnections > 0)
             {
                 System.err.print("batch count [" + batchCount + "]: ");
                 value = console.readLine().trim();
@@ -159,9 +169,9 @@ public class LoadClientMain
                 {
                     for (int j = 0; j < batchSize; ++j)
                     {
-                        int clientIndex = random.nextInt(this.clients.size());
-                        Connection connection = this.clients.get(clientIndex);
-                        connection.write(content);
+                        int clientIndex = random.nextInt(this.connections.size());
+                        LatencyAsyncInterpreter connection = this.connections.get(clientIndex);
+                        connection.send(content);
                         ++expected;
                     }
 
@@ -312,73 +322,18 @@ public class LoadClientMain
         System.err.println(TimeUnit.NANOSECONDS.toMillis(maxLatency.get()) + " ms");
     }
 
-    private class Connection implements AsyncConnectorListener
+    private class LatencyAsyncInterpreter extends AbstractAsyncInterpreter
     {
-        private final ClientConnector connector;
-        private volatile AsyncCoordinator coordinator;
-
-        private Connection(Executor threadPool)
-        {
-            connector = new StandardAsyncClientConnector(this, threadPool);
-        }
-
-        public AsyncInterpreter connected(AsyncCoordinator coordinator)
-        {
-            this.coordinator = coordinator;
-            return new LatencyAsyncInterpreter(coordinator);
-        }
-
-        public void connect(InetSocketAddress address)
-        {
-            connector.connect(address);
-        }
-
-        public void close()
-        {
-            connector.close();
-        }
-
-        public void write(byte[] content)
-        {
-            ByteBuffer buffer = ByteBuffer.allocate(8 + content.length + 1);
-            long time = System.nanoTime();
-            for (int i = 0; i < 8; ++i)
-            {
-                byte b = (byte)(time & 0xFF);
-                buffer.put(b);
-                time >>>= 8;
-            }
-            buffer.put(content);
-            buffer.put((byte)0x7F);
-            buffer.flip();
-            coordinator.writeFrom(buffer);
-        }
-    }
-
-    private class LatencyAsyncInterpreter implements AsyncInterpreter
-    {
-        private final AsyncCoordinator coordinator;
-        private final ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-        private final ByteBuffer writeBuffer = ByteBuffer.allocate(1024);
         private long time = 0;
         private int timeBytes = 0;
 
         private LatencyAsyncInterpreter(AsyncCoordinator coordinator)
         {
-            this.coordinator = coordinator;
+            super(coordinator);
         }
 
-        public ByteBuffer getReadBuffer()
-        {
-            return readBuffer;
-        }
-
-        public ByteBuffer getWriteBuffer()
-        {
-            return writeBuffer;
-        }
-
-        public void readFrom(ByteBuffer buffer)
+        @Override
+        protected void read(ByteBuffer buffer)
         {
             while (buffer.hasRemaining())
             {
@@ -404,7 +359,24 @@ public class LoadClientMain
                     }
                 }
             }
-            coordinator.needsRead(true);
+        }
+
+        public void send(byte[] content)
+        {
+            ByteBuffer buffer = ByteBuffer.allocate(8 + content.length + 1);
+            buffer.clear();
+            long time = System.nanoTime();
+            for (int k = 0; k < 8; ++k)
+            {
+                byte b = (byte)(time & 0xFF);
+                buffer.put(b);
+                time >>>= 8;
+            }
+            buffer.put(content);
+            buffer.put((byte)0x7F);
+            buffer.flip();
+
+            write(buffer);
         }
     }
 }

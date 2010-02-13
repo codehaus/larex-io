@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io;
+package org.codehaus.larex.io.connector;
 
-import java.net.InetSocketAddress;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.ServerSocketChannel;
 
 /**
- * Responsibility: to create and operate on {@link SocketChannel}s.
+ * Responsibility: to create and operate on {@link ServerSocketChannel}s.
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface ClientConnector
+public interface ServerConnector
 {
-    public void connect(InetSocketAddress address) throws RuntimeSocketConnectException;
+    public int listen();
 
     public void close();
 
-    boolean awaitClosed(long timeout) throws InterruptedException;
+    boolean join(long timeout) throws InterruptedException;
 }

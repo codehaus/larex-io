@@ -26,8 +26,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
-import org.codehaus.larex.io.ServerConnector;
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.connector.ServerConnector;
+import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -45,24 +48,24 @@ public class AsyncServerConnectorCloseAfterAcceptTest
             InetAddress loopback = InetAddress.getByName(null);
             InetSocketAddress address = new InetSocketAddress(loopback, 0);
 
-            AsyncConnectorListener listener = new AsyncConnectorListener()
+            AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
             {
-                public AsyncInterpreter connected(AsyncCoordinator coordinator)
+                public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
                 {
                     return null;
                 }
             };
 
             final CountDownLatch latch = new CountDownLatch(1);
-            ServerConnector serverConnector = new StandardAsyncServerConnector(address, listener, threadPool)
+            ServerConnector serverConnector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers())
             {
                 @Override
-                protected AsyncEndpoint newEndpoint(SocketChannel channel, AsyncCoordinator coordinator)
+                protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
                 {
-                    return new StandardAsyncEndpoint(channel, coordinator)
+                    return new StandardAsyncChannel(channel, coordinator, byteBuffers)
                     {
                         @Override
-                        public void register(Selector selector, SelectorManager.Listener listener) throws RuntimeSocketClosedException
+                        public void register(Selector selector, AsyncSelector.Listener listener) throws RuntimeSocketClosedException
                         {
                             try
                             {
@@ -77,10 +80,10 @@ public class AsyncServerConnectorCloseAfterAcceptTest
                 }
 
                 @Override
-                protected void register(AsyncEndpoint endpoint, AsyncCoordinator coordinator)
+                protected void register(AsyncSelector selector, AsyncChannel channel, AsyncCoordinator coordinator)
                 {
-                    endpoint.close();
-                    super.register(endpoint, coordinator);
+                    channel.close();
+                    super.register(selector, channel, coordinator);
                 }
             };
             int port = serverConnector.listen();
@@ -89,7 +92,7 @@ public class AsyncServerConnectorCloseAfterAcceptTest
                 Socket socket = new Socket(loopback, port);
                 try
                 {
-                    // Wait for the SelectorManager to register the endpoint
+                    // Wait for the AsyncSelector to register the channel
                     Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 
                     // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).

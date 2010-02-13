@@ -25,12 +25,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.codehaus.larex.io.ByteBuffers;
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -47,15 +51,16 @@ public class AsyncServerConnectorReadZeroTest
         {
             final AtomicReference<ByteBuffer> data = new AtomicReference<ByteBuffer>();
             final CountDownLatch latch = new CountDownLatch(1);
-            AsyncConnectorListener listener = new AsyncConnectorListener()
+            AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
             {
-                public AsyncInterpreter connected(AsyncCoordinator coordinator)
+                public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
                 {
                     return new EchoAsyncInterpreter(coordinator)
                     {
-                        public void readFrom(ByteBuffer bytes)
+                        @Override
+                        protected void read(ByteBuffer buffer)
                         {
-                            data.set(bytes);
+                            data.set(copy(buffer));
                             latch.countDown();
                         }
                     };
@@ -66,22 +71,22 @@ public class AsyncServerConnectorReadZeroTest
             final AtomicInteger needReads = new AtomicInteger();
             InetAddress loopback = InetAddress.getByName(null);
             InetSocketAddress address = new InetSocketAddress(loopback, 0);
-            StandardAsyncServerConnector serverConnector = new StandardAsyncServerConnector(address, listener, threadPool)
+            StandardAsyncServerConnector serverConnector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers())
             {
                 @Override
-                protected AsyncEndpoint newEndpoint(SocketChannel channel, AsyncCoordinator coordinator)
+                protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
                 {
-                    return new StandardAsyncEndpoint(channel, coordinator)
+                    return new StandardAsyncChannel(channel, coordinator, byteBuffers)
                     {
                         private final AtomicInteger reads = new AtomicInteger();
 
                         @Override
-                        protected int readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
+                        protected boolean readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
                         {
                             if (this.reads.compareAndSet(0, 1))
                             {
                                 // In the first greedy read, we simulate a zero bytes read
-                                return 0;
+                                return false;
                             }
                             else
                             {
@@ -92,15 +97,15 @@ public class AsyncServerConnectorReadZeroTest
                 }
 
                 @Override
-                protected AsyncCoordinator newCoordinator()
+                protected AsyncCoordinator newCoordinator(AsyncSelector selector, Executor threadPool)
                 {
-                    return new StandardAsyncCoordinator(getSelector(), getThreadPool())
+                    return new StandardAsyncCoordinator(selector, threadPool)
                     {
                         @Override
-                        public void readFrom(ByteBuffer bytes)
+                        public void onRead(ByteBuffer bytes)
                         {
                             reads.incrementAndGet();
-                            super.readFrom(bytes);
+                            super.onRead(bytes);
                         }
 
                         @Override

@@ -28,9 +28,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.codehaus.larex.io.ClientConnector;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
-import org.codehaus.larex.io.ServerConnector;
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.connector.ClientConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
+import org.codehaus.larex.io.connector.async.StandardAsyncClientConnector;
+import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -63,9 +66,9 @@ public class StandardAsyncClientConnectorTest
         InetAddress loopback = InetAddress.getByName(null);
         InetSocketAddress address = new InetSocketAddress(loopback, 0);
 
-        AsyncConnectorListener serverListener = new AsyncConnectorListener()
+        AsyncInterpreterFactory serverInterpreterFactory = new AsyncInterpreterFactory()
         {
-            public AsyncInterpreter connected(AsyncCoordinator coordinator)
+            public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
             {
                 return new EchoAsyncInterpreter(coordinator);
             }
@@ -73,15 +76,15 @@ public class StandardAsyncClientConnectorTest
 
         final CountDownLatch responseLatch = new CountDownLatch(1);
         final AtomicReference<AsyncCoordinator> clientCoordinatorRef = new AtomicReference<AsyncCoordinator>();
-        AsyncConnectorListener clientListener = new AsyncConnectorListener()
+        AsyncInterpreterFactory clientInterpreterFactory = new AsyncInterpreterFactory()
         {
-            public AsyncInterpreter connected(AsyncCoordinator coordinator)
+            public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
             {
                 clientCoordinatorRef.set(coordinator);
                 return new EchoAsyncInterpreter(coordinator)
                 {
                     @Override
-                    public void readFrom(ByteBuffer buffer)
+                    public void onRead(ByteBuffer buffer)
                     {
                         responseLatch.countDown();
                     }
@@ -90,7 +93,7 @@ public class StandardAsyncClientConnectorTest
         };
 
         final CountDownLatch acceptLatch = new CountDownLatch(1);
-        ServerConnector serverConnector = new StandardAsyncServerConnector(address, serverListener, threadPool)
+        ServerConnector serverConnector = new StandardAsyncServerConnector(address, serverInterpreterFactory, threadPool, new ThreadLocalByteBuffers())
         {
             @Override
             protected void accepted(SocketChannel channel) throws IOException
@@ -103,13 +106,13 @@ public class StandardAsyncClientConnectorTest
 
         try
         {
-            ClientConnector clientConnector = new StandardAsyncClientConnector(clientListener, threadPool);
+            ClientConnector clientConnector = new StandardAsyncClientConnector(clientInterpreterFactory, threadPool);
             try
             {
                 clientConnector.connect(new InetSocketAddress(loopback, port));
                 assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));
 
-                clientCoordinatorRef.get().writeFrom(ByteBuffer.wrap(new byte[]{1}));
+                clientCoordinatorRef.get().write(ByteBuffer.wrap(new byte[]{1}));
                 assertTrue(responseLatch.await(1000, TimeUnit.MILLISECONDS));
             }
             finally
@@ -128,11 +131,11 @@ public class StandardAsyncClientConnectorTest
     {
         InetAddress loopback = InetAddress.getByName(null);
         InetSocketAddress address = new InetSocketAddress(loopback, 0);
-        ServerConnector serverConnector = new StandardAsyncServerConnector(address, null, threadPool);
+        ServerConnector serverConnector = new StandardAsyncServerConnector(address, null, threadPool, new ThreadLocalByteBuffers());
         int port = serverConnector.listen();
         address = new InetSocketAddress(address.getAddress(), port);
         serverConnector.close();
-        serverConnector.awaitClosed(1000L);
+        serverConnector.join(1000L);
 
         final AtomicBoolean closed = new AtomicBoolean();
         ClientConnector clientConnector = new StandardAsyncClientConnector(null, threadPool)

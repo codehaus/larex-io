@@ -1,0 +1,115 @@
+/*
+ * Copyright (c) 2010-2010 the original author or authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.codehaus.larex.io.async;
+
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.connector.StandardClientConnector;
+import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * @version $Revision$ $Date$
+ */
+public class ClientRemoteWriteCloseTest
+{
+    private ExecutorService threadPool;
+
+    @Before
+    public void initThreadPool()
+    {
+        threadPool = Executors.newCachedThreadPool();
+    }
+
+    @After
+    public void shutdownThreadPool()
+    {
+        threadPool.shutdown();
+    }
+
+    @Test
+    public void testRemoteClose() throws Exception
+    {
+        InetSocketAddress address = new InetSocketAddress("localhost", 0);
+
+        AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
+        {
+            public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+            {
+                return new AbstractAsyncInterpreter(coordinator)
+                {
+                    @Override
+                    public void onOpen()
+                    {
+                        super.onOpen();
+                        write(ByteBuffer.wrap(new byte[]{1}));
+                        close();
+                    }
+                };
+            }
+        };
+
+        StandardAsyncServerConnector serverConnector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers());
+        int port = serverConnector.listen();
+
+        final AtomicInteger tester = new AtomicInteger();
+        final AtomicInteger failure = new AtomicInteger();
+        final CountDownLatch latch = new CountDownLatch(1);
+        StandardClientConnector connector = new StandardClientConnector(threadPool);
+        AbstractAsyncInterpreter connection = connector.newEndpoint(new AsyncInterpreterFactory<AbstractAsyncInterpreter>()
+        {
+            public AbstractAsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+            {
+                return new AbstractAsyncInterpreter(coordinator)
+                {
+                    @Override
+                    protected void read(ByteBuffer buffer)
+                    {
+                        if (!tester.compareAndSet(0, 1))
+                            failure.set(1);
+                    }
+
+                    @Override
+                    protected void closed()
+                    {
+                        if (!tester.compareAndSet(1, 2))
+                            failure.set(2);
+                        latch.countDown();
+                    }
+                };
+            }
+        }).connect(new InetSocketAddress(address.getHostName(), port));
+
+        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+        assertEquals(2, tester.get());
+        assertEquals(0, failure.get());
+
+        connection.close();
+    }
+}

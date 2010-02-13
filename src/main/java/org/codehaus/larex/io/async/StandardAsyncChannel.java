@@ -25,6 +25,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 
+import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.slf4j.Logger;
@@ -33,30 +34,49 @@ import org.slf4j.LoggerFactory;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class StandardAsyncEndpoint implements AsyncEndpoint
+public class StandardAsyncChannel implements AsyncChannel
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final SocketChannel channel;
     private final AsyncCoordinator coordinator;
-    private final int readAggressiveness;
-    private final int writeAggressiveness;
+    private final ByteBuffers byteBuffers;
+    private volatile int readAggressiveness = 2;
+    private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
     private Thread writer;
 
-    public StandardAsyncEndpoint(SocketChannel channel, AsyncCoordinator coordinator)
+    public StandardAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
     {
         this.channel = channel;
         this.coordinator = coordinator;
-        // TODO: make aggressiveness configurable
-        this.readAggressiveness = 2;
-        this.writeAggressiveness = 2;
+        this.byteBuffers = byteBuffers;
     }
 
-    public void register(Selector selector, SelectorManager.Listener listener) throws RuntimeSocketClosedException
+    public int getReadAggressiveness()
+    {
+        return readAggressiveness;
+    }
+
+    public void setReadAggressiveness(int readAggressiveness)
+    {
+        this.readAggressiveness = readAggressiveness;
+    }
+
+    public int getWriteAggressiveness()
+    {
+        return writeAggressiveness;
+    }
+
+    public void setWriteAggressiveness(int writeAggressiveness)
+    {
+        this.writeAggressiveness = writeAggressiveness;
+    }
+
+    public void register(Selector selector, AsyncSelector.Listener listener) throws RuntimeSocketClosedException
     {
 	    try
 		{
-	        selectionKey = channel.register(selector, SelectionKey.OP_READ, listener);
+	        selectionKey = channel.register(selector, 0, listener);
         }
         catch (ClosedChannelException x)
         {
@@ -74,7 +94,7 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
             else
                 selectionKey.interestOps(oldOperations & ~operations);
             int newOperations = selectionKey.interestOps();
-            logger.debug("Endpoint {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
+            logger.debug("Channel {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
         }
         catch (CancelledKeyException x)
         {
@@ -82,20 +102,33 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
         }
     }
 
-    public void readInto(ByteBuffer buffer) throws RuntimeSocketClosedException
+    public void read(int readBufferSize) throws RuntimeSocketClosedException
     {
-        buffer.clear();
         try
         {
-            int read = readAggressively(channel, buffer);
-            logger.debug("Endpoint {} read {} bytes into {}", new Object[]{this, read, buffer});
-
-            if (read > 0)
+            int read;
+            ByteBuffer buffer = byteBuffers.acquire(readBufferSize, false);
+            try
             {
-                buffer.flip();
-                coordinator.readFrom(buffer);
+                int start = buffer.position();
+                boolean closed = readAggressively(channel, buffer);
+                read = buffer.position() - start;
+                logger.debug("Channel {} read {} bytes into {}", new Object[]{this, read, buffer});
+
+                if (read > 0)
+                {
+                    buffer.flip();
+                    coordinator.onRead(buffer);
+                    if (closed)
+                        coordinator.onClose();
+                }
             }
-            else
+            finally
+            {
+                byteBuffers.release(buffer);
+            }
+
+            if (read == 0)
             {
                 if (channel.isOpen())
                 {
@@ -110,7 +143,7 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
         }
         catch (ClosedChannelException x)
         {
-            logger.debug("Endpoint closed during read");
+            logger.debug("Channel closed during read");
             close();
             throw new RuntimeSocketClosedException(x);
         }
@@ -122,22 +155,16 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
         }
     }
 
-    protected int readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
+    protected boolean readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
     {
-        int result = 0;
+        int readAggressiveness = this.readAggressiveness;
         for (int aggressiveness = 0; aggressiveness < readAggressiveness; ++aggressiveness)
         {
-            int read = this.channel.read(buffer);
+            int read = channel.read(buffer);
             if (read < 0)
-            {
-                throw new ClosedChannelException();
-            }
-            else
-            {
-                result += read;
-            }
+                return true;
         }
-        return result;
+        return false;
     }
 
     public void write(ByteBuffer buffer) throws RuntimeSocketClosedException
@@ -147,7 +174,7 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
             while (buffer.hasRemaining())
             {
                 int written = writeAggressively(channel, buffer);
-                logger.debug("Endpoint {} wrote {} bytes from {}", new Object[]{this, written, buffer});
+                logger.debug("Channel {} wrote {} bytes from {}", new Object[]{this, written, buffer});
 
                 if (buffer.hasRemaining())
                 {
@@ -173,9 +200,6 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
                     }
                 }
             }
-
-            // We wrote everything, clear and return
-            buffer.clear();
         }
         catch (InterruptedException x)
         {
@@ -186,7 +210,7 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
         }
         catch (ClosedChannelException x)
         {
-            logger.debug("Endpoint closed during write of {} bytes", buffer.remaining());
+            logger.debug("Channel closed during write of {} bytes", buffer.remaining());
             close();
             throw new RuntimeSocketClosedException(x);
         }
@@ -214,6 +238,7 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
 
     protected int writeAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
     {
+        int writeAggressiveness = this.writeAggressiveness;
         int result = 0;
         for (int aggressiveness = 0; aggressiveness < writeAggressiveness; ++aggressiveness)
         {
@@ -232,7 +257,7 @@ public class StandardAsyncEndpoint implements AsyncEndpoint
             if (selectionKey != null)
                 selectionKey.cancel();
 
-            logger.debug("Endpoint {} closing", this);
+            logger.debug("Channel {} closing", this);
             channel.close();
         }
         catch (IOException x)

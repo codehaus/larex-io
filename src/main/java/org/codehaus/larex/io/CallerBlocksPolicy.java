@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
-import java.nio.ByteBuffer;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * <p>{@link AsyncInterpreter} interprets bytes read from the I/O system.</p>
- * <p>The interpretation of the bytes normally happens with push parsers, and may involve calling
- * user code to allow processing of the incoming data and production of outgoing data.</p>
- * <p>User code may be offered a blocking I/O API (such in case of servlets); in such case,
- * the interpreter must handle the concurrency properly.</p>
- *
- * @version $Revision: 903 $ $Date$
+ * @version $Revision$ $Date$
  */
-public interface AsyncInterpreter
+public class CallerBlocksPolicy implements RejectedExecutionHandler
 {
-    void onOpen();
-
-    void onRead(ByteBuffer buffer);
-
-    void onClose();
+    public void rejectedExecution(Runnable task, ThreadPoolExecutor executor)
+    {
+        try
+        {
+            executor.getQueue().put(task);
+        }
+        catch (InterruptedException x)
+        {
+            throw new RejectedExecutionException(x);
+        }
+    }
 }
