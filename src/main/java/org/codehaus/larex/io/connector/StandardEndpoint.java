@@ -53,14 +53,21 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
     private final Executor threadPool;
     private final ScheduledExecutorService scheduler;
 
-    public StandardEndpoint(SocketChannel channel, Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+    public StandardEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
     {
-        this.channel = channel;
-        this.selector = selector;
-        this.connectionFactory = connectionFactory;
-        this.byteBuffers = byteBuffers;
-        this.threadPool = threadPool;
-        this.scheduler = scheduler;
+        try
+        {
+            this.channel = SocketChannel.open();
+            this.selector = selector;
+            this.connectionFactory = connectionFactory;
+            this.byteBuffers = byteBuffers;
+            this.threadPool = threadPool;
+            this.scheduler = scheduler;
+        }
+        catch (IOException x)
+        {
+            throw new RuntimeIOException(x);
+        }
     }
 
     @Override
