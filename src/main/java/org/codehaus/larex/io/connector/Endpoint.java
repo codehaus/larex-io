@@ -18,7 +18,7 @@ package org.codehaus.larex.io.connector;
 
 import java.net.InetSocketAddress;
 
-import org.codehaus.larex.io.async.Connection;
+import org.codehaus.larex.io.Connection;
 
 /**
  * @version $Revision$ $Date$

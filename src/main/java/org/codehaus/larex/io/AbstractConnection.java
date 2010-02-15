@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 
-import org.codehaus.larex.io.RuntimeSocketClosedException;
-import org.codehaus.larex.io.RuntimeSocketTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +41,7 @@ public abstract class AbstractConnection implements Connection
         return coordinator;
     }
 
-    protected ByteBuffer copy(ByteBuffer source)
+    public ByteBuffer copy(ByteBuffer source)
     {
         ByteBuffer result = ByteBuffer.allocate(source.remaining());
         result.put(source);
@@ -69,7 +67,7 @@ public abstract class AbstractConnection implements Connection
         }
     }
 
-    protected void write(ByteBuffer buffer)
+    public void write(ByteBuffer buffer)
     {
         while (buffer.hasRemaining())
         {
@@ -116,7 +114,7 @@ public abstract class AbstractConnection implements Connection
         }
     }
 
-    protected void close()
+    public void close()
     {
         synchronized (this)
         {

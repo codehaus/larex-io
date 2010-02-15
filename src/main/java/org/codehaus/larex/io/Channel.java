@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
-
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 
 /**
  * <p>{@link Channel} hides the complexity of working with {@link SelectableChannel}s.</p>

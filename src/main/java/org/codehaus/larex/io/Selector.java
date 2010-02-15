@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 /**
  * <p>{@link Selector} hides the complexity of working with {@link java.nio.channels.Selector}.</p>

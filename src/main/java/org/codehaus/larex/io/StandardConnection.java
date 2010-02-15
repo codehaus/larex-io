@@ -14,30 +14,44 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 
 /**
- * <p>{@link Connection} interprets bytes read from the I/O system.</p>
- * <p>The interpretation of the bytes normally happens with push parsers, and may involve calling
- * user code to allow processing of the incoming data and production of outgoing data.</p>
- * <p>User code may be offered a blocking I/O API (such in case of servlets); in such case,
- * the connection must handle the concurrency properly.</p>
- *
- * @version $Revision: 903 $ $Date$
+ * @version $Revision$ $Date$
  */
-public interface Connection
+public abstract class StandardConnection extends AbstractConnection
 {
-    void onOpen();
+    public StandardConnection(Coordinator coordinator)
+    {
+        super(coordinator);
+    }
 
-    void onRead(ByteBuffer buffer);
+    public void onOpen()
+    {
+        getCoordinator().needsRead(true);
+    }
 
-    void onReadTimeout();
+    public void onRead(ByteBuffer buffer)
+    {
+        read(buffer);
+        getCoordinator().needsRead(true);
+    }
 
-    void onWrite();
+    public void onReadTimeout()
+    {
+    }
 
-    void onWriteTimeout();
+    protected abstract void read(ByteBuffer buffer);
 
-    void onClose();
+    public void onClosed()
+    {
+        closed();
+        close();
+    }
+
+    protected void closed()
+    {
+    }
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,8 +31,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.codehaus.larex.io.ByteBuffers;
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.After;
 import org.junit.Assert;

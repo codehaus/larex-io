@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.Executor;
-
-import org.codehaus.larex.io.RuntimeSocketClosedException;
-import org.codehaus.larex.io.RuntimeSocketTimeoutException;
 
 /**
  * @version $Revision$ $Date$
@@ -105,7 +102,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
         return buffer.position() - start;
     }
 
-    public void onClose()
+    public void onClosed()
     {
         synchronized (this)
         {
@@ -116,7 +113,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
     }
 
     @Override
-    protected void close()
+    public void close()
     {
         synchronized (this)
         {

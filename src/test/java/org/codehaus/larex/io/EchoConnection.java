@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.connector;
+package org.codehaus.larex.io;
 
-import java.net.InetSocketAddress;
-import java.nio.channels.SocketChannel;
-
-import org.codehaus.larex.io.RuntimeSocketConnectException;
+import java.nio.ByteBuffer;
 
 /**
- * Responsibility: to create and operate on {@link SocketChannel}s.
- *
  * @version $Revision: 903 $ $Date$
  */
-public interface ClientConnector
+public class EchoConnection extends StandardConnection
 {
-    public void connect(InetSocketAddress address) throws RuntimeSocketConnectException;
+    public EchoConnection(Coordinator coordinator)
+    {
+        super(coordinator);
+    }
 
-    public void close();
-
-    boolean awaitClosed(long timeout) throws InterruptedException;
+    @Override
+    protected void read(ByteBuffer buffer)
+    {
+        write(buffer);
+    }
 }

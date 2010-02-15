@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.io.IOException;
 import java.nio.channels.ClosedSelectorException;
@@ -26,8 +26,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

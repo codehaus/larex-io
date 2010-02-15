@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -26,8 +26,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.codehaus.larex.io.ByteBuffers;
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.After;
 import org.junit.Assert;

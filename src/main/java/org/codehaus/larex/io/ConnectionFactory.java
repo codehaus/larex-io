@@ -14,23 +14,12 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
-
-import java.nio.ByteBuffer;
+package org.codehaus.larex.io;
 
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class EchoConnection extends StandardConnection
+public interface ConnectionFactory<T extends Connection>
 {
-    public EchoConnection(Coordinator coordinator)
-    {
-        super(coordinator);
-    }
-
-    @Override
-    protected void read(ByteBuffer buffer)
-    {
-        write(buffer);
-    }
+    T newConnection(Coordinator coordinator);
 }

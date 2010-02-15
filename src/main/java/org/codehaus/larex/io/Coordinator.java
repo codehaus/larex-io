@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
-
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 
 /**
  * <p>{@link Coordinator} coordinates the activity between the {@link Channel},

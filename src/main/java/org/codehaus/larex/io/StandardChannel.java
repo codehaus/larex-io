@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -23,9 +23,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
-import org.codehaus.larex.io.ByteBuffers;
-import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

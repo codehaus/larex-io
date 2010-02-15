@@ -27,16 +27,16 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.ByteBuffers;
+import org.codehaus.larex.io.Channel;
+import org.codehaus.larex.io.Connection;
+import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.ReadWriteSelector;
 import org.codehaus.larex.io.RuntimeIOException;
+import org.codehaus.larex.io.Selector;
+import org.codehaus.larex.io.StandardChannel;
 import org.codehaus.larex.io.ThreadLocalByteBuffers;
-import org.codehaus.larex.io.async.Channel;
-import org.codehaus.larex.io.async.Connection;
-import org.codehaus.larex.io.async.ConnectionFactory;
-import org.codehaus.larex.io.async.Coordinator;
-import org.codehaus.larex.io.async.ReadWriteSelector;
-import org.codehaus.larex.io.async.Selector;
-import org.codehaus.larex.io.async.StandardChannel;
-import org.codehaus.larex.io.async.TimeoutCoordinator;
+import org.codehaus.larex.io.TimeoutCoordinator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

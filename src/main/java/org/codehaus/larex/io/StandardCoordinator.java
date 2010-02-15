@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.async;
+package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.Executor;
 
-import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,7 +132,7 @@ public class StandardCoordinator implements Coordinator
 
     public void onClose()
     {
-        connection.onClose();
+        connection.onClosed();
     }
 
     private class ReadCommand implements Runnable
