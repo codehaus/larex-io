@@ -102,20 +102,19 @@ public class StandardChannel implements Channel
         try
         {
             int read;
+            boolean closed;
             ByteBuffer buffer = byteBuffers.acquire(readBufferSize, false);
             try
             {
                 int start = buffer.position();
-                boolean closed = readAggressively(channel, buffer);
+                closed = readAggressively(channel, buffer);
                 read = buffer.position() - start;
-                logger.debug("Channel {} read {} bytes into {}", new Object[]{this, read, buffer});
 
                 if (read > 0)
                 {
+                    logger.debug("Channel {} read {} bytes into {}", new Object[]{this, read, buffer});
                     buffer.flip();
                     coordinator.onRead(buffer);
-                    if (closed)
-                        coordinator.onClose();
                 }
             }
             finally
@@ -123,17 +122,15 @@ public class StandardChannel implements Channel
                 byteBuffers.release(buffer);
             }
 
-            if (read == 0)
+            if (closed)
             {
-                if (channel.isOpen())
-                {
-                    // We read 0 bytes, we need to re-register for read interest
-                    coordinator.needsRead(true);
-                }
-                else
-                {
-                    throw new ClosedChannelException();
-                }
+                logger.debug("Channel {} closed remotely", this);
+                coordinator.onClose();
+            }
+            else if (read == 0)
+            {
+                // We read 0 bytes, we need to re-register for read interest
+                coordinator.needsRead(true);
             }
         }
         catch (ClosedChannelException x)

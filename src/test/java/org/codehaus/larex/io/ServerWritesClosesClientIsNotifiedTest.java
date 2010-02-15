@@ -37,7 +37,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * @version $Revision$ $Date$
  */
-public class ClientRemoteWriteCloseTest
+public class ServerWritesClosesClientIsNotifiedTest
 {
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
