@@ -14,20 +14,12 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.connector;
-
-import java.nio.channels.ServerSocketChannel;
+package org.codehaus.larex.io.async;
 
 /**
- * Responsibility: to create and operate on {@link ServerSocketChannel}s.
- *
  * @version $Revision: 903 $ $Date$
  */
-public interface ServerConnector
+public interface ConnectionFactory<T extends Connection>
 {
-    public int listen();
-
-    public void close();
-
-    boolean join(long timeout) throws InterruptedException;
+    T newConnection(Coordinator coordinator);
 }

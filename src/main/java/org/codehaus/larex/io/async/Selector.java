@@ -17,18 +17,18 @@
 package org.codehaus.larex.io.async;
 
 /**
- * <p>{@link AsyncSelector} hides the complexity of working with {@link java.nio.channels.Selector}.</p>
- * <p>A {@link AsyncSelector} associates an {@link AsyncChannel} to a {@link Listener} so that
+ * <p>{@link Selector} hides the complexity of working with {@link java.nio.channels.Selector}.</p>
+ * <p>A {@link Selector} associates an {@link Channel} to a {@link Listener} so that
  * when the I/O system associated to the channel signals readiness for I/O events, the listener is
  * notified. This normally results in the listener to call the channel to perform the actual I/O.</p>
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface AsyncSelector
+public interface Selector
 {
-    public void register(AsyncChannel channel, Listener listener);
+    public void register(Channel channel, Listener listener);
 
-    public void update(AsyncChannel channel, int operations, boolean add);
+    public void update(Channel channel, int operations, boolean add);
 
     public void wakeup();
 
@@ -37,29 +37,29 @@ public interface AsyncSelector
     public boolean join(long timeout) throws InterruptedException;
 
     /**
-     * <p>The interface for receiving events from the {@link AsyncSelector}.</p>
+     * <p>The interface for receiving events from the {@link Selector}.</p>
      */
     public interface Listener
     {
         /**
-         * <p>Invoked when the {@link AsyncSelector} first registers with the I/O system.</p>
+         * <p>Invoked when the {@link Selector} first registers with the I/O system.</p>
          */
         void open();
 
         /**
-         * <p>Invoked when the {@link AsyncSelector} detects that the I/O system is ready to read.</p>
+         * <p>Invoked when the {@link Selector} detects that the I/O system is ready to read.</p>
          * @see #writeReady()
          */
         public void readReady();
 
         /**
-         * <p>Invoked when the {@link AsyncSelector} detects that the I/O system is ready to write.</p>
+         * <p>Invoked when the {@link Selector} detects that the I/O system is ready to write.</p>
          * @see #readReady()
          */
         public void writeReady();
 
         /**
-         * <p>Invoked when the {@link AsyncSelector} detects that the I/O system is closed.</p>
+         * <p>Invoked when the {@link Selector} detects that the I/O system is closed.</p>
          */
         void close();
     }

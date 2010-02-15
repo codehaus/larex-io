@@ -19,10 +19,8 @@ package org.codehaus.larex.io.async;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 
 import org.codehaus.larex.io.ByteBuffers;
@@ -34,18 +32,18 @@ import org.slf4j.LoggerFactory;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class StandardAsyncChannel implements AsyncChannel
+public class StandardChannel implements Channel
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final SocketChannel channel;
-    private final AsyncCoordinator coordinator;
+    private final Coordinator coordinator;
     private final ByteBuffers byteBuffers;
     private volatile int readAggressiveness = 2;
     private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
     private Thread writer;
 
-    public StandardAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
+    public StandardChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
     {
         this.channel = channel;
         this.coordinator = coordinator;
@@ -72,7 +70,7 @@ public class StandardAsyncChannel implements AsyncChannel
         this.writeAggressiveness = writeAggressiveness;
     }
 
-    public void register(Selector selector, AsyncSelector.Listener listener) throws RuntimeSocketClosedException
+    public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException
     {
 	    try
 		{
@@ -167,46 +165,11 @@ public class StandardAsyncChannel implements AsyncChannel
         return false;
     }
 
-    public void write(ByteBuffer buffer) throws RuntimeSocketClosedException
+    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
     {
         try
         {
-            while (buffer.hasRemaining())
-            {
-                int written = writeAggressively(channel, buffer);
-                logger.debug("Channel {} wrote {} bytes from {}", new Object[]{this, written, buffer});
-
-                if (buffer.hasRemaining())
-                {
-                    // We could not write everything, suspend the writer thread until we are write ready
-                    synchronized (this)
-                    {
-                        // We must issue the needsWrite() below within the sync block, otherwise
-                        // another thread can issue a notify that no one is ready to listen and
-                        // this thread will wait forever for a notify that already happened.
-
-                        // We wrote less bytes then expected, register for write interest
-                        coordinator.needsWrite(true);
-
-                        assert writer == null;
-                        writer = Thread.currentThread();
-
-                        while (writer != null)
-                        {
-                            logger.debug("Writer thread {} suspended on partial write, {} bytes remaining", writer, buffer.remaining());
-                            wait();
-                        }
-                        logger.debug("Writer thread {} resumed, {} bytes remaining", writer, buffer.remaining());
-                    }
-                }
-            }
-        }
-        catch (InterruptedException x)
-        {
-            logger.debug("Interrupted during pending write");
-            close();
-            Thread.currentThread().interrupt();
-            throw new RuntimeSocketClosedException(new ClosedByInterruptException());
+            return writeAggressively(channel, buffer);
         }
         catch (ClosedChannelException x)
         {
@@ -219,20 +182,6 @@ public class StandardAsyncChannel implements AsyncChannel
             logger.debug("Unexpected IOException", x);
             close();
             throw new RuntimeIOException(x);
-        }
-    }
-
-    public void writeReady()
-    {
-        // Notify writing thread
-        synchronized (this)
-        {
-            if (writer != null)
-            {
-                logger.debug("Write ready, signaling writer thread {}", writer);
-                writer = null;
-                notify();
-            }
         }
     }
 

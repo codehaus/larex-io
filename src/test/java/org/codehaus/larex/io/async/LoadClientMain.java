@@ -28,6 +28,8 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +48,7 @@ public class LoadClientMain
         new LoadClientMain().run();
     }
 
-    private final List<LatencyAsyncInterpreter> connections = new ArrayList<LatencyAsyncInterpreter>();
+    private final List<LatencyConnection> connections = new ArrayList<LatencyConnection>();
     private final AtomicLong start = new AtomicLong();
     private final AtomicLong end = new AtomicLong();
     private final AtomicLong responses = new AtomicLong();
@@ -61,7 +63,9 @@ public class LoadClientMain
         int maxThreads = 500;
         ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
-        StandardClientConnector connector = new StandardClientConnector(threadPool);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+        StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
 
         Random random = new Random();
 
@@ -100,11 +104,11 @@ public class LoadClientMain
 
             System.err.println("Waiting for connections to be ready...");
 
-            AsyncInterpreterFactory<LatencyAsyncInterpreter> interpreterFactory = new AsyncInterpreterFactory<LatencyAsyncInterpreter>()
+            ConnectionFactory<LatencyConnection> connectionFactory = new ConnectionFactory<LatencyConnection>()
             {
-                public LatencyAsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+                public LatencyConnection newConnection(Coordinator coordinator)
                 {
-                    return new LatencyAsyncInterpreter(coordinator);
+                    return new LatencyConnection(coordinator);
                 }
             };
             InetSocketAddress address = new InetSocketAddress(host, port);
@@ -115,7 +119,7 @@ public class LoadClientMain
             {
                 for (int i = 0; i < connections - currentConnections; ++i)
                 {
-                    LatencyAsyncInterpreter connection = connector.newEndpoint(interpreterFactory).connect(address);
+                    LatencyConnection connection = connector.newEndpoint(connectionFactory).connect(address);
                     this.connections.add(connection);
                 }
             }
@@ -123,7 +127,7 @@ public class LoadClientMain
             {
                 for (int i = 0; i < currentConnections - connections; ++i)
                 {
-                    LatencyAsyncInterpreter connection = this.connections.remove(currentConnections - i - 1);
+                    LatencyConnection connection = this.connections.remove(currentConnections - i - 1);
                     connection.close();
                 }
             }
@@ -170,7 +174,7 @@ public class LoadClientMain
                     for (int j = 0; j < batchSize; ++j)
                     {
                         int clientIndex = random.nextInt(this.connections.size());
-                        LatencyAsyncInterpreter connection = this.connections.get(clientIndex);
+                        LatencyConnection connection = this.connections.get(clientIndex);
                         connection.send(content);
                         ++expected;
                     }
@@ -322,12 +326,12 @@ public class LoadClientMain
         System.err.println(TimeUnit.NANOSECONDS.toMillis(maxLatency.get()) + " ms");
     }
 
-    private class LatencyAsyncInterpreter extends AbstractAsyncInterpreter
+    private class LatencyConnection extends StandardConnection
     {
         private long time = 0;
         private int timeBytes = 0;
 
-        private LatencyAsyncInterpreter(AsyncCoordinator coordinator)
+        private LatencyConnection(Coordinator coordinator)
         {
             super(coordinator);
         }

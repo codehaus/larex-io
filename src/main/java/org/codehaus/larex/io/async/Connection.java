@@ -19,18 +19,25 @@ package org.codehaus.larex.io.async;
 import java.nio.ByteBuffer;
 
 /**
+ * <p>{@link Connection} interprets bytes read from the I/O system.</p>
+ * <p>The interpretation of the bytes normally happens with push parsers, and may involve calling
+ * user code to allow processing of the incoming data and production of outgoing data.</p>
+ * <p>User code may be offered a blocking I/O API (such in case of servlets); in such case,
+ * the connection must handle the concurrency properly.</p>
+ *
  * @version $Revision: 903 $ $Date$
  */
-public class EchoAsyncInterpreter extends AbstractAsyncInterpreter
+public interface Connection
 {
-    public EchoAsyncInterpreter(AsyncCoordinator coordinator)
-    {
-        super(coordinator);
-    }
+    void onOpen();
 
-    @Override
-    protected void read(ByteBuffer buffer)
-    {
-        write(buffer);
-    }
+    void onRead(ByteBuffer buffer);
+
+    void onReadTimeout();
+
+    void onWrite();
+
+    void onWriteTimeout();
+
+    void onClose();
 }

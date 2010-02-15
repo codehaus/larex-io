@@ -18,16 +18,15 @@ package org.codehaus.larex.io.async;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.Selector;
 
 import org.codehaus.larex.io.RuntimeSocketClosedException;
 
 /**
- * <p>{@link AsyncChannel} hides the complexity of working with {@link SelectableChannel}s.</p>
+ * <p>{@link Channel} hides the complexity of working with {@link SelectableChannel}s.</p>
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface AsyncChannel
+public interface Channel
 {
     /**
      * <p>Registers this channel with the given {@code selector} for read interest
@@ -36,9 +35,9 @@ public interface AsyncChannel
      * @param selector   the selector this channel must register with
      * @param listener   the attachment to the registration
      * @throws RuntimeSocketClosedException if this channel has been closed
-     * @see SelectableChannel#register(Selector, int, Object)
+     * @see SelectableChannel#register(java.nio.channels.Selector , int, Object)
      */
-    public void register(Selector selector, AsyncSelector.Listener listener) throws RuntimeSocketClosedException;
+    public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException;
 
     /**
      * <p>Updates the channel's interests, adding (or removing) the given {@code operations}.</p>
@@ -50,9 +49,7 @@ public interface AsyncChannel
 
     public void read(int readBufferSize) throws RuntimeSocketClosedException;
 
-    public void write(ByteBuffer buffer) throws RuntimeSocketClosedException;
-
-    public void writeReady();
+    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 
     public void close();
 }

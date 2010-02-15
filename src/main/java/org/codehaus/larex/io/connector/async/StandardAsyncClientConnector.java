@@ -27,14 +27,14 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
 import org.codehaus.larex.io.ThreadLocalByteBuffers;
-import org.codehaus.larex.io.async.AsyncChannel;
-import org.codehaus.larex.io.async.AsyncCoordinator;
-import org.codehaus.larex.io.async.AsyncInterpreter;
-import org.codehaus.larex.io.async.AsyncInterpreterFactory;
-import org.codehaus.larex.io.async.AsyncSelector;
-import org.codehaus.larex.io.async.ReadWriteAsyncSelector;
-import org.codehaus.larex.io.async.StandardAsyncChannel;
-import org.codehaus.larex.io.async.StandardAsyncCoordinator;
+import org.codehaus.larex.io.async.Channel;
+import org.codehaus.larex.io.async.Connection;
+import org.codehaus.larex.io.async.ConnectionFactory;
+import org.codehaus.larex.io.async.Coordinator;
+import org.codehaus.larex.io.async.ReadWriteSelector;
+import org.codehaus.larex.io.async.Selector;
+import org.codehaus.larex.io.async.StandardChannel;
+import org.codehaus.larex.io.async.StandardCoordinator;
 import org.codehaus.larex.io.connector.ClientConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,20 +45,20 @@ import org.slf4j.LoggerFactory;
 public class StandardAsyncClientConnector implements ClientConnector
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
-    private final AsyncInterpreterFactory interpreterFactory;
+    private final ConnectionFactory connectionFactory;
     private final Executor threadPool;
-    private final AsyncSelector selector;
+    private final Selector selector;
     private final SocketChannel channel;
     private volatile ByteBuffers byteBuffers = new ThreadLocalByteBuffers();
-    private volatile AsyncCoordinator coordinator;
+    private volatile Coordinator coordinator;
 
-    public StandardAsyncClientConnector(AsyncInterpreterFactory interpreterFactory, Executor threadPool)
+    public StandardAsyncClientConnector(ConnectionFactory connectionFactory, Executor threadPool)
     {
         try
         {
-            this.interpreterFactory = interpreterFactory;
+            this.connectionFactory = connectionFactory;
             this.threadPool = threadPool;
-            selector = new ReadWriteAsyncSelector();
+            selector = new ReadWriteSelector();
             channel = SocketChannel.open();
         }
         catch (IOException x)
@@ -105,11 +105,11 @@ public class StandardAsyncClientConnector implements ClientConnector
 
         coordinator = newCoordinator();
 
-        AsyncChannel asyncChannel = newAsyncChannel(channel, coordinator);
+        Channel asyncChannel = newAsyncChannel(channel, coordinator);
         coordinator.setAsyncChannel(asyncChannel);
 
-        AsyncInterpreter interpreter = interpreterFactory.newAsyncInterpreter(coordinator);
-        coordinator.setAsyncInterpreter(interpreter);
+        Connection connection = connectionFactory.newConnection(coordinator);
+        coordinator.setConnection(connection);
 
         register(asyncChannel, coordinator);
     }
@@ -141,17 +141,17 @@ public class StandardAsyncClientConnector implements ClientConnector
         return threadPool;
     }
 
-    protected AsyncCoordinator newCoordinator()
+    protected Coordinator newCoordinator()
     {
-        return new StandardAsyncCoordinator(selector, getThreadPool());
+        return new StandardCoordinator(selector, getThreadPool());
     }
 
-    protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator)
+    protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator)
     {
-        return new StandardAsyncChannel(channel, coordinator, byteBuffers);
+        return new StandardChannel(channel, coordinator, byteBuffers);
     }
 
-    protected void register(AsyncChannel channel, AsyncCoordinator coordinator)
+    protected void register(Channel channel, Coordinator coordinator)
     {
         selector.register(channel, coordinator);
     }

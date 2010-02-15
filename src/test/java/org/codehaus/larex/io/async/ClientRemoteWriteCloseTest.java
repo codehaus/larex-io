@@ -21,12 +21,12 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.codehaus.larex.io.ThreadLocalByteBuffers;
 import org.codehaus.larex.io.connector.StandardClientConnector;
-import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
+import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,16 +40,19 @@ import static org.junit.Assert.assertTrue;
 public class ClientRemoteWriteCloseTest
 {
     private ExecutorService threadPool;
+    private ScheduledExecutorService scheduler;
 
     @Before
-    public void initThreadPool()
+    public void init()
     {
         threadPool = Executors.newCachedThreadPool();
+        scheduler = Executors.newSingleThreadScheduledExecutor();
     }
 
     @After
-    public void shutdownThreadPool()
+    public void destroy()
     {
+        scheduler.shutdown();
         threadPool.shutdown();
     }
 
@@ -58,11 +61,11 @@ public class ClientRemoteWriteCloseTest
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
-        AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
+        ConnectionFactory connectionFactory = new ConnectionFactory()
         {
-            public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+            public Connection newConnection(Coordinator coordinator)
             {
-                return new AbstractAsyncInterpreter(coordinator)
+                return new StandardConnection(coordinator)
                 {
                     @Override
                     public void onOpen()
@@ -71,22 +74,27 @@ public class ClientRemoteWriteCloseTest
                         write(ByteBuffer.wrap(new byte[]{1}));
                         close();
                     }
+
+                    @Override
+                    protected void read(ByteBuffer buffer)
+                    {
+                    }
                 };
             }
         };
 
-        StandardAsyncServerConnector serverConnector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers());
+        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler);
         int port = serverConnector.listen();
 
         final AtomicInteger tester = new AtomicInteger();
         final AtomicInteger failure = new AtomicInteger();
         final CountDownLatch latch = new CountDownLatch(1);
-        StandardClientConnector connector = new StandardClientConnector(threadPool);
-        AbstractAsyncInterpreter connection = connector.newEndpoint(new AsyncInterpreterFactory<AbstractAsyncInterpreter>()
+        StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+        StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
         {
-            public AbstractAsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+            public StandardConnection newConnection(Coordinator coordinator)
             {
-                return new AbstractAsyncInterpreter(coordinator)
+                return new StandardConnection(coordinator)
                 {
                     @Override
                     protected void read(ByteBuffer buffer)

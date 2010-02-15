@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.connector.async;
+package org.codehaus.larex.io.connector;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -23,57 +23,70 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.async.AsyncChannel;
-import org.codehaus.larex.io.async.AsyncCoordinator;
-import org.codehaus.larex.io.async.AsyncInterpreter;
-import org.codehaus.larex.io.async.AsyncInterpreterFactory;
-import org.codehaus.larex.io.async.AsyncSelector;
-import org.codehaus.larex.io.async.ReadWriteAsyncSelector;
-import org.codehaus.larex.io.async.StandardAsyncChannel;
-import org.codehaus.larex.io.async.StandardAsyncCoordinator;
-import org.codehaus.larex.io.connector.ServerConnector;
+import org.codehaus.larex.io.ThreadLocalByteBuffers;
+import org.codehaus.larex.io.async.Channel;
+import org.codehaus.larex.io.async.Connection;
+import org.codehaus.larex.io.async.ConnectionFactory;
+import org.codehaus.larex.io.async.Coordinator;
+import org.codehaus.larex.io.async.ReadWriteSelector;
+import org.codehaus.larex.io.async.Selector;
+import org.codehaus.larex.io.async.StandardChannel;
+import org.codehaus.larex.io.async.TimeoutCoordinator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * // TODO: adding the number of selectors will move us towards a "connection" abstraction
  * @version $Revision: 903 $ $Date$
  */
-public class StandardAsyncServerConnector implements ServerConnector
+public class StandardServerConnector
 {
-    private static final AtomicInteger ids = new AtomicInteger();
-
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final InetSocketAddress address;
-    private final AsyncInterpreterFactory interpreterFactory;
+    private final ConnectionFactory connectionFactory;
     private final Executor threadPool;
+    private final ScheduledExecutorService scheduler;
     private final ByteBuffers byteBuffers;
-    private final AsyncSelector[] selectors;
+    private final Selector[] selectors;
     private final AtomicInteger selector = new AtomicInteger();
-    private volatile Boolean reuseAddress;
-    private volatile Integer backlogSize;
+    private volatile boolean reuseAddress = true;
+    private volatile int backlogSize = 128;
+    private volatile long readTimeout = 0;
+    private volatile long writeTimeout = 0;
     private volatile Thread acceptorThread;
     private volatile ServerSocketChannel serverChannel;
 
-    public StandardAsyncServerConnector(InetSocketAddress address, AsyncInterpreterFactory interpreterFactory, Executor threadPool, ByteBuffers byteBuffers)
+    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, ScheduledExecutorService scheduler)
     {
-        this(address, interpreterFactory, threadPool, byteBuffers, 1);
+        this(address, connectionFactory, threadPool, scheduler, 1);
     }
-    public StandardAsyncServerConnector(InetSocketAddress address, AsyncInterpreterFactory interpreterFactory, Executor threadPool, ByteBuffers byteBuffers, int selectors)
+
+    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, ScheduledExecutorService scheduler, int selectors)
     {
         this.address = address;
-        this.interpreterFactory = interpreterFactory;
+        this.connectionFactory = connectionFactory;
         this.threadPool = threadPool;
-        this.byteBuffers = byteBuffers;
+        this.scheduler = scheduler;
+        this.byteBuffers = newByteBuffers();
         if (selectors < 1)
             throw new IllegalArgumentException("Invalid selectors count " + selectors + ": must be >= 1");
-        this.selectors = new AsyncSelector[selectors];
+        this.selectors = new Selector[selectors];
         for (int i = 0; i < selectors; ++i)
             this.selectors[i] = newAsyncSelector();
+    }
+
+    protected ByteBuffers newByteBuffers()
+    {
+        return new ThreadLocalByteBuffers();
+    }
+
+    protected Selector newAsyncSelector()
+    {
+        return new ReadWriteSelector();
     }
 
     public Boolean isReuseAddress()
@@ -96,10 +109,28 @@ public class StandardAsyncServerConnector implements ServerConnector
         this.backlogSize = backlogSize;
     }
 
+    public long getReadTimeout()
+    {
+        return readTimeout;
+    }
+
+    public void setReadTimeout(long readTimeout)
+    {
+        this.readTimeout = readTimeout;
+    }
+
+    public long getWriteTimeout()
+    {
+        return writeTimeout;
+    }
+
+    public void setWriteTimeout(long writeTimeout)
+    {
+        this.writeTimeout = writeTimeout;
+    }
+
     public int listen() throws RuntimeIOException
     {
-        initializeDefaults();
-
         try
         {
             serverChannel = ServerSocketChannel.open();
@@ -112,25 +143,11 @@ public class StandardAsyncServerConnector implements ServerConnector
             throw new RuntimeIOException(x);
         }
 
-        threadPool.execute(new Acceptor()); // TODO: use thread factory ?
+        // TODO: use more acceptor threads ?
+        // TODO: use a thread factory ?
+        threadPool.execute(new Acceptor());
 
         return serverChannel.socket().getLocalPort();
-    }
-
-    protected AsyncSelector newAsyncSelector()
-    {
-        return new ReadWriteAsyncSelector();
-    }
-
-    private void initializeDefaults()
-    {
-        if (reuseAddress == null)
-            reuseAddress = true;
-
-        if (backlogSize == null)
-            backlogSize = 128;
-        if (backlogSize <= 0)
-            throw new IllegalArgumentException("Illegal backlog size " + backlogSize + ": must be positive");
     }
 
     public void close()
@@ -138,7 +155,7 @@ public class StandardAsyncServerConnector implements ServerConnector
         logger.debug("ServerConnector {} closing", this);
         try
         {
-            for (AsyncSelector selector : selectors)
+            for (Selector selector : selectors)
                 selector.close();
             serverChannel.close();
             logger.debug("ServerConnector {} closed", this);
@@ -159,33 +176,37 @@ public class StandardAsyncServerConnector implements ServerConnector
     {
         channel.configureBlocking(false);
 
-        // Pick a selector
-        int index = selector.incrementAndGet();
-        index = Math.abs(index % selectors.length);
-        AsyncSelector selector = selectors[index];
+        Selector selector = chooseSelector(selectors);
 
-        AsyncCoordinator coordinator = newCoordinator(selector, threadPool);
+        Coordinator coordinator = newCoordinator(selector, threadPool);
 
-        AsyncChannel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
+        Channel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
         coordinator.setAsyncChannel(asyncChannel);
 
-        AsyncInterpreter interpreter = interpreterFactory.newAsyncInterpreter(coordinator);
-        coordinator.setAsyncInterpreter(interpreter);
+        Connection connection = connectionFactory.newConnection(coordinator);
+        coordinator.setConnection(connection);
 
         register(selector, asyncChannel, coordinator);
     }
 
-    protected AsyncCoordinator newCoordinator(AsyncSelector selector, Executor threadPool)
+    protected Selector chooseSelector(Selector[] selectors)
     {
-        return new StandardAsyncCoordinator(selector, threadPool);
+        int index = selector.incrementAndGet();
+        index = Math.abs(index % selectors.length);
+        return selectors[index];
     }
 
-    protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
+    protected Coordinator newCoordinator(Selector selector, Executor threadPool)
     {
-        return new StandardAsyncChannel(channel, coordinator, byteBuffers);
+        return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }
 
-    protected void register(AsyncSelector selector, AsyncChannel channel, AsyncCoordinator coordinator)
+    protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+    {
+        return new StandardChannel(channel, coordinator, byteBuffers);
+    }
+
+    protected void register(Selector selector, Channel channel, Coordinator coordinator)
     {
         selector.register(channel, coordinator);
     }

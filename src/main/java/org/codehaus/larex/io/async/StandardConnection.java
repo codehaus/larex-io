@@ -21,47 +21,29 @@ import java.nio.ByteBuffer;
 /**
  * @version $Revision$ $Date$
  */
-public abstract class AbstractAsyncInterpreter implements AsyncInterpreter
+public abstract class StandardConnection extends AbstractConnection
 {
-    private final AsyncCoordinator coordinator;
-
-    public AbstractAsyncInterpreter(AsyncCoordinator coordinator)
+    public StandardConnection(Coordinator coordinator)
     {
-        this.coordinator = coordinator;
+        super(coordinator);
     }
 
     public void onOpen()
     {
-        coordinator.needsRead(true);
+        getCoordinator().needsRead(true);
     }
 
     public void onRead(ByteBuffer buffer)
     {
         read(buffer);
-        coordinator.needsRead(true);
+        getCoordinator().needsRead(true);
     }
 
-    protected void read(ByteBuffer buffer)
+    public void onReadTimeout()
     {
     }
 
-    protected ByteBuffer copy(ByteBuffer source)
-    {
-        ByteBuffer result = ByteBuffer.allocate(source.remaining());
-        result.put(source);
-        result.flip();
-        return result;
-    }
-
-    protected void write(ByteBuffer buffer)
-    {
-        coordinator.write(buffer);
-    }
-
-    protected void close()
-    {
-        coordinator.close();
-    }
+    protected abstract void read(ByteBuffer buffer);
 
     public void onClose()
     {

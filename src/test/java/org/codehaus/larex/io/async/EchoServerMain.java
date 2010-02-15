@@ -19,14 +19,14 @@ package org.codehaus.larex.io.async;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.codehaus.larex.io.CallerBlocksPolicy;
-import org.codehaus.larex.io.ThreadLocalByteBuffers;
-import org.codehaus.larex.io.connector.ServerConnector;
-import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
+import org.codehaus.larex.io.connector.StandardServerConnector;
 
 /**
  * @version $Revision: 13 $ $Date$
@@ -39,14 +39,17 @@ public class EchoServerMain
         ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
         InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(null), 8850);
-        AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+        ConnectionFactory connectionFactory = new ConnectionFactory()
         {
-            public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
+            public Connection newConnection(Coordinator coordinator)
             {
-                return new EchoAsyncInterpreter(coordinator);
+                return new EchoConnection(coordinator);
             }
         };
-        ServerConnector connector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers());
+        StandardServerConnector connector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler);
         connector.listen();
     }
 }

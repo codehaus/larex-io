@@ -19,7 +19,6 @@ package org.codehaus.larex.io.async;
 import java.io.IOException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
@@ -35,33 +34,33 @@ import org.slf4j.LoggerFactory;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class ReadWriteAsyncSelector implements AsyncSelector
+public class ReadWriteSelector implements Selector
 {
     private static final AtomicInteger ids = new AtomicInteger();
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final Queue<Runnable> tasks = new ConcurrentLinkedQueue<Runnable>();
-    private final Selector selector;
+    private final java.nio.channels.Selector selector;
     private final Thread thread;
 
-    public ReadWriteAsyncSelector()
+    public ReadWriteSelector()
     {
         this(new ThreadFactory()
         {
             public Thread newThread(Runnable r)
             {
                 Thread thread = new Thread(r);
-                thread.setName(AsyncSelector.class.getSimpleName() + "-" + ids.incrementAndGet());
+                thread.setName(Selector.class.getSimpleName() + "-" + ids.incrementAndGet());
                 return thread;
             }
         });
     }
 
-    public ReadWriteAsyncSelector(ThreadFactory threadFactory)
+    public ReadWriteSelector(ThreadFactory threadFactory)
     {
         try
         {
-            this.selector = Selector.open();
+            this.selector = java.nio.channels.Selector.open();
             this.thread = threadFactory.newThread(new SelectorLoop());
             this.thread.start();
         }
@@ -71,13 +70,13 @@ public class ReadWriteAsyncSelector implements AsyncSelector
         }
     }
 
-    public void register(AsyncChannel channel, Listener listener)
+    public void register(Channel channel, Listener listener)
     {
         tasks.add(new Register(selector, channel, listener));
         wakeup();
     }
 
-    public void update(AsyncChannel channel, int operations, boolean add)
+    public void update(Channel channel, int operations, boolean add)
     {
         Update task = new Update(channel, operations, add);
         if (Thread.currentThread() == thread)
@@ -134,11 +133,11 @@ public class ReadWriteAsyncSelector implements AsyncSelector
 
     private class Register implements Runnable
     {
-        private final Selector selector;
-        private final AsyncChannel channel;
+        private final java.nio.channels.Selector selector;
+        private final Channel channel;
         private final Listener listener;
 
-        private Register(Selector selector, AsyncChannel channel, Listener listener)
+        private Register(java.nio.channels.Selector selector, Channel channel, Listener listener)
         {
             this.selector = selector;
             this.channel = channel;
@@ -161,11 +160,11 @@ public class ReadWriteAsyncSelector implements AsyncSelector
 
     private class Update implements Runnable
     {
-        private final AsyncChannel channel;
+        private final Channel channel;
         private final int operations;
         private final boolean add;
 
-        public Update(AsyncChannel channel, int operations, boolean add)
+        public Update(Channel channel, int operations, boolean add)
         {
             this.channel = channel;
             this.operations = operations;

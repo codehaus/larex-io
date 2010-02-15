@@ -25,34 +25,57 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * // TODO: implement read and write timeouts, between needs[Read|Write]() and [read|write]Ready()
- * // TODO: not quite: need to throw exceptions in the calling thread (for write at least)
  * @version $Revision: 903 $ $Date$
  */
-public class StandardAsyncCoordinator implements AsyncCoordinator
+public class StandardCoordinator implements Coordinator
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final AsyncSelector selector;
+    private final Selector selector;
     private final Executor threadPool;
-    private final Runnable reader = new Reader();
-    private volatile AsyncChannel channel;
-    private volatile AsyncInterpreter interpreter;
+    private final Runnable readCommand = new ReadCommand();
+    private volatile Channel channel;
+    private volatile Connection connection;
     private volatile int readBufferSize = 1024;
 
-    public StandardAsyncCoordinator(AsyncSelector selector, Executor threadPool)
+    public StandardCoordinator(Selector selector, Executor threadPool)
     {
         this.selector = selector;
         this.threadPool = threadPool;
     }
 
-    public void setAsyncChannel(AsyncChannel channel)
+    protected Selector getSelector()
+    {
+        return selector;
+    }
+
+    protected Executor getThreadPool()
+    {
+        return threadPool;
+    }
+
+    protected Channel getAsyncChannel()
+    {
+        return channel;
+    }
+
+    public void setAsyncChannel(Channel channel)
     {
         this.channel = channel;
     }
 
-    public void setAsyncInterpreter(AsyncInterpreter interpreter)
+    protected Connection getConnection()
     {
-        this.interpreter = interpreter;
+        return connection;
+    }
+
+    public void setConnection(Connection connection)
+    {
+        this.connection = connection;
+    }
+
+    protected int getReadBufferSize()
+    {
+        return readBufferSize;
     }
 
     public void setReadBufferSize(int size)
@@ -62,7 +85,7 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
 
     public void open()
     {
-        interpreter.onOpen();
+        connection.onOpen();
     }
 
     public void readReady()
@@ -71,7 +94,7 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
         // continue to notify us that it is ready to read
         needsRead(false);
         // Dispatch the read to another thread
-        threadPool.execute(reader);
+        threadPool.execute(readCommand);
     }
 
     public void writeReady()
@@ -80,7 +103,7 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
-        channel.writeReady();
+        connection.onWrite();
     }
 
     public void needsRead(boolean needsRead)
@@ -95,12 +118,12 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
 
     public void onRead(ByteBuffer buffer)
     {
-        interpreter.onRead(buffer);
+        connection.onRead(buffer);
     }
 
-    public void write(ByteBuffer buffer) throws RuntimeSocketClosedException
+    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
     {
-        channel.write(buffer);
+        return channel.write(buffer);
     }
 
     public void close()
@@ -110,10 +133,10 @@ public class StandardAsyncCoordinator implements AsyncCoordinator
 
     public void onClose()
     {
-        interpreter.onClose();
+        connection.onClose();
     }
 
-    private class Reader implements Runnable
+    private class ReadCommand implements Runnable
     {
         public void run()
         {

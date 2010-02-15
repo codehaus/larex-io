@@ -18,12 +18,12 @@ package org.codehaus.larex.io.connector;
 
 import java.net.InetSocketAddress;
 
-import org.codehaus.larex.io.async.AsyncInterpreter;
+import org.codehaus.larex.io.async.Connection;
 
 /**
  * @version $Revision$ $Date$
  */
-public abstract class Endpoint<T extends AsyncInterpreter>
+public abstract class Endpoint<T extends Connection>
 {
     private InetSocketAddress bindAddress;
     private int connectTimeout;

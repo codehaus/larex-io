@@ -19,15 +19,16 @@ package org.codehaus.larex.io.connector;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.ThreadLocalByteBuffers;
-import org.codehaus.larex.io.async.AsyncInterpreter;
-import org.codehaus.larex.io.async.AsyncInterpreterFactory;
-import org.codehaus.larex.io.async.AsyncSelector;
-import org.codehaus.larex.io.async.ReadWriteAsyncSelector;
+import org.codehaus.larex.io.async.Connection;
+import org.codehaus.larex.io.async.ConnectionFactory;
+import org.codehaus.larex.io.async.ReadWriteSelector;
+import org.codehaus.larex.io.async.Selector;
 
 /**
  * @version $Revision$ $Date$
@@ -35,22 +36,24 @@ import org.codehaus.larex.io.async.ReadWriteAsyncSelector;
 public class StandardClientConnector
 {
     private final Executor threadPool;
+    private final ScheduledExecutorService scheduler;
     private final ByteBuffers byteBuffers;
-    private final AsyncSelector[] selectors;
+    private final Selector[] selectors;
     private final AtomicInteger selector = new AtomicInteger();
 
-    public StandardClientConnector(Executor threadPool)
+    public StandardClientConnector(Executor threadPool, ScheduledExecutorService scheduler)
     {
-        this(threadPool, 1);
+        this(threadPool, scheduler, 1);
     }
 
-    public StandardClientConnector(Executor threadPool, int selectors)
+    public StandardClientConnector(Executor threadPool, ScheduledExecutorService scheduler, int selectors)
     {
         this.threadPool = threadPool;
+        this.scheduler = scheduler;
         this.byteBuffers = newByteBuffers();
         if (selectors < 1)
             throw new IllegalArgumentException("Invalid selectors count " + selectors + ": must be >= 1");
-        this.selectors = new AsyncSelector[selectors];
+        this.selectors = new Selector[selectors];
         for (int i = 0; i < selectors; ++i)
             this.selectors[i] = newAsyncSelector();
     }
@@ -60,22 +63,18 @@ public class StandardClientConnector
         return new ThreadLocalByteBuffers();
     }
 
-    protected AsyncSelector newAsyncSelector()
+    protected Selector newAsyncSelector()
     {
-        return new ReadWriteAsyncSelector();
+        return new ReadWriteSelector();
     }
 
-    public <T extends AsyncInterpreter> Endpoint<T> newEndpoint(AsyncInterpreterFactory<T> interpreterFactory)
+    public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
     {
-        // Pick a selector
-        int index = selector.incrementAndGet();
-        index = Math.abs(index % selectors.length);
-        AsyncSelector asyncSelector = selectors[index];
-
+        Selector selector = chooseSelector(selectors);
         try
         {
             SocketChannel channel = SocketChannel.open();
-            return newEndpoint(channel, asyncSelector, interpreterFactory, threadPool, byteBuffers);
+            return newEndpoint(channel, selector, connectionFactory, byteBuffers, threadPool, scheduler);
         }
         catch (IOException x)
         {
@@ -83,8 +82,15 @@ public class StandardClientConnector
         }
     }
 
-    protected <T extends AsyncInterpreter> Endpoint<T> newEndpoint(SocketChannel channel, AsyncSelector asyncSelector, AsyncInterpreterFactory<T> interpreterFactory, Executor threadPool, ByteBuffers byteBuffers)
+    protected Selector chooseSelector(Selector[] selectors)
     {
-        return new StandardEndpoint<T>(channel, asyncSelector, interpreterFactory, threadPool, byteBuffers);
+        int index = selector.incrementAndGet();
+        index = Math.abs(index % selectors.length);
+        return selectors[index];
+    }
+
+    protected <T extends Connection> Endpoint<T> newEndpoint(SocketChannel channel, Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+    {
+        return new StandardEndpoint<T>(channel, selector, connectionFactory, byteBuffers, threadPool, scheduler);
     }
 }

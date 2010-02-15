@@ -19,6 +19,7 @@ package org.codehaus.larex.io.async;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.codehaus.larex.io.connector.Endpoint;
 import org.codehaus.larex.io.connector.StandardClientConnector;
@@ -30,37 +31,33 @@ import org.junit.Test;
 public class UsageTest
 {
     @Test
+    public void dummy()
+    {
+    }
+
+//    @Test
     public void testAsyncUsage()
     {
         InetSocketAddress address = null;
 //        AsyncClientConnector connector = new StandardAsyncClientConnector(threadPool);
         Executor threadPool = null;
-        StandardClientConnector connector = new StandardClientConnector(threadPool);
+        ScheduledExecutorService scheduler = null;
+        StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
         // Default configuration for all connections
 //        connector.setBindAddress(address);
 //        connector.setConnectTimeout(1000L);
 //        connector.setReadTimeout(1000L);
 //        connector.setWriteTimeout(1000L);
-        AsyncInterpreterFactory<AbstractAsyncInterpreter> interpreterFactory = null;
+        ConnectionFactory<StandardConnection> connectionFactory = null;
         // Class "connection" can be shared with the sync package ?
-        Endpoint<AbstractAsyncInterpreter> endpoint = connector.newEndpoint(interpreterFactory);
+        Endpoint<StandardConnection> endpoint = connector.newEndpoint(connectionFactory);
         endpoint.setBindAddress(address);
         endpoint.setConnectTimeout(1000);
         endpoint.setReadTimeout(1000);
         endpoint.setWriteTimeout(1000);
-        AbstractAsyncInterpreter connection = endpoint.connect(address);
+        StandardConnection connection = endpoint.connect(address);
         ByteBuffer buffer = null;
         connection.write(buffer);
         connection.close();
-
-//        // What about only having a connection, just like socket ?
-//        ClientConnector c = new StandardAsyncClientConnector(/*asyncselectors, threadpool => global*//*,asynclistener => local*/);
-//        c.setBindAddress();
-//        c.connect(address);
-//        c.close();
-
-        // Given a scenario where we have 1 JVM, 1 thread pool, 1 asyncselectormanager
-        // then we need a way to create connections to A) different addresses; B) with different protocols (ie asyncinterpreters)
-        // Ideally: 1 selector loop thread; N read threads from the thread pool
     }
 }

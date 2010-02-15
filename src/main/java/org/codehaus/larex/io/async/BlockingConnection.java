@@ -14,31 +14,31 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io.block;
+package org.codehaus.larex.io.async;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.Executor;
 
 import org.codehaus.larex.io.RuntimeSocketClosedException;
-import org.codehaus.larex.io.async.AsyncCoordinator;
-import org.codehaus.larex.io.async.AsyncInterpreter;
+import org.codehaus.larex.io.RuntimeSocketTimeoutException;
 
 /**
  * @version $Revision$ $Date$
  */
-public abstract class AbstractBlockingInterpreter implements AsyncInterpreter, Runnable
+public abstract class BlockingConnection extends AbstractConnection implements Runnable
 {
-    private final AsyncCoordinator coordinator;
     private final Executor threadPool;
     private ByteBuffer buffer;
-    private State state = State.READ;
+    private State state = State.WAIT;
 
-    public AbstractBlockingInterpreter(AsyncCoordinator coordinator, Executor threadPool)
+    public BlockingConnection(Coordinator coordinator, Executor threadPool)
     {
-        this.coordinator = coordinator;
+        super(coordinator);
         this.threadPool = threadPool;
     }
+
+    public abstract void run();
 
     public void onOpen()
     {
@@ -55,11 +55,11 @@ public abstract class AbstractBlockingInterpreter implements AsyncInterpreter, R
         }
     }
 
-    public void onClose()
+    public void onReadTimeout()
     {
         synchronized (this)
         {
-            state = State.CLOSE;
+            state = State.TIMEOUT;
             notify();
         }
     }
@@ -67,17 +67,16 @@ public abstract class AbstractBlockingInterpreter implements AsyncInterpreter, R
     protected int read(ByteBuffer buffer)
     {
         int start = buffer.position();
-        coordinator.setReadBufferSize(buffer.remaining());
+        getCoordinator().setReadBufferSize(buffer.remaining());
+
         synchronized (this)
         {
-            // TODO: not quite: I can have a buffer to give to the user
-            // I must check if the buffer is empty, and then if it's closed
-            if (state == State.CLOSE)
+            if (state == State.CLOSED)
                 return -1;
 
             this.buffer = buffer;
             state = State.WAIT;
-            coordinator.needsRead(true);
+            getCoordinator().needsRead(true);
             while (state == State.WAIT)
             {
                 try
@@ -92,33 +91,43 @@ public abstract class AbstractBlockingInterpreter implements AsyncInterpreter, R
                 }
             }
 
-            if (state == State.CLOSE)
-                return -1;
-
-            return buffer.position() - start;
+            if (buffer.position() == start)
+            {
+                if (state == State.TIMEOUT)
+                    throw new RuntimeSocketTimeoutException();
+                else if (state == State.CLOSE)
+                    throw new RuntimeSocketClosedException();
+                else if (state == State.CLOSED)
+                    return -1;
+            }
         }
+
+        return buffer.position() - start;
     }
 
-    protected ByteBuffer copy(ByteBuffer source)
+    public void onClose()
     {
-        ByteBuffer result = ByteBuffer.allocate(source.remaining());
-        result.put(source);
-        result.flip();
-        return result;
+        synchronized (this)
+        {
+            state = State.CLOSED;
+            notify();
+        }
+        super.close();
     }
 
-    protected void write(ByteBuffer buffer)
-    {
-        coordinator.write(buffer);
-    }
-
+    @Override
     protected void close()
     {
-        coordinator.close();
+        synchronized (this)
+        {
+            state = State.CLOSE;
+            notify();
+        }
+        super.close();
     }
 
     private enum State
     {
-        READ, WAIT, CLOSE
+        READ, WAIT, TIMEOUT, CLOSED, CLOSE
     }
 }

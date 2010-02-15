@@ -24,40 +24,43 @@ import java.net.SocketTimeoutException;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
 import org.codehaus.larex.io.RuntimeSocketTimeoutException;
-import org.codehaus.larex.io.async.AsyncChannel;
-import org.codehaus.larex.io.async.AsyncCoordinator;
-import org.codehaus.larex.io.async.AsyncInterpreter;
-import org.codehaus.larex.io.async.AsyncInterpreterFactory;
-import org.codehaus.larex.io.async.AsyncSelector;
-import org.codehaus.larex.io.async.StandardAsyncChannel;
-import org.codehaus.larex.io.async.StandardAsyncCoordinator;
+import org.codehaus.larex.io.async.Channel;
+import org.codehaus.larex.io.async.Connection;
+import org.codehaus.larex.io.async.ConnectionFactory;
+import org.codehaus.larex.io.async.Coordinator;
+import org.codehaus.larex.io.async.Selector;
+import org.codehaus.larex.io.async.StandardChannel;
+import org.codehaus.larex.io.async.TimeoutCoordinator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * @version $Revision$ $Date$
  */
-public class StandardEndpoint<T extends AsyncInterpreter> extends Endpoint<T>
+public class StandardEndpoint<T extends Connection> extends Endpoint<T>
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final SocketChannel channel;
-    private final AsyncSelector selector;
-    private final AsyncInterpreterFactory<T> interpreterFactory;
-    private final Executor threadPool;
+    private final Selector selector;
+    private final ConnectionFactory<T> connectionFactory;
     private final ByteBuffers byteBuffers;
+    private final Executor threadPool;
+    private final ScheduledExecutorService scheduler;
 
-    public StandardEndpoint(SocketChannel channel, AsyncSelector selector, AsyncInterpreterFactory<T> interpreterFactory, Executor threadPool, ByteBuffers byteBuffers)
+    public StandardEndpoint(SocketChannel channel, Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
     {
         this.channel = channel;
         this.selector = selector;
-        this.interpreterFactory = interpreterFactory;
-        this.threadPool = threadPool;
+        this.connectionFactory = connectionFactory;
         this.byteBuffers = byteBuffers;
+        this.threadPool = threadPool;
+        this.scheduler = scheduler;
     }
 
     @Override
@@ -106,30 +109,30 @@ public class StandardEndpoint<T extends AsyncInterpreter> extends Endpoint<T>
     {
         channel.configureBlocking(false);
 
-        AsyncCoordinator coordinator = newCoordinator(selector, threadPool);
+        Coordinator coordinator = newCoordinator(selector, threadPool, scheduler);
 
-        AsyncChannel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
+        Channel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
         coordinator.setAsyncChannel(asyncChannel);
 
-        T interpreter = interpreterFactory.newAsyncInterpreter(coordinator);
-        coordinator.setAsyncInterpreter(interpreter);
+        T connection = connectionFactory.newConnection(coordinator);
+        coordinator.setConnection(connection);
 
         register(selector, asyncChannel, coordinator);
 
-        return interpreter;
+        return connection;
     }
 
-    protected AsyncCoordinator newCoordinator(AsyncSelector selector, Executor threadPool)
+    protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
     {
-        return new StandardAsyncCoordinator(selector, threadPool);
+        return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }
 
-    protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
+    protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
     {
-        return new StandardAsyncChannel(channel, coordinator, byteBuffers);
+        return new StandardChannel(channel, coordinator, byteBuffers);
     }
 
-    protected void register(AsyncSelector selector, AsyncChannel channel, AsyncCoordinator coordinator)
+    protected void register(Selector selector, Channel channel, Coordinator coordinator)
     {
         selector.register(channel, coordinator);
     }

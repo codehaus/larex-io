@@ -19,19 +19,19 @@ package org.codehaus.larex.io.async;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
-import org.codehaus.larex.io.ThreadLocalByteBuffers;
-import org.codehaus.larex.io.connector.ServerConnector;
-import org.codehaus.larex.io.connector.async.StandardAsyncServerConnector;
+import org.codehaus.larex.io.connector.StandardServerConnector;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -39,85 +39,95 @@ import org.junit.Test;
  */
 public class AsyncServerConnectorCloseAfterAcceptTest
 {
+    private ExecutorService threadPool;
+    private ScheduledExecutorService scheduler;
+
+    @Before
+    public void init()
+    {
+        threadPool = Executors.newCachedThreadPool();
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+    }
+
+    @After
+    public void destroy()
+    {
+        scheduler.shutdown();
+        threadPool.shutdown();
+    }
+
     @Test
     public void testCloseAfterAccept() throws Exception
     {
-        ExecutorService threadPool = Executors.newCachedThreadPool();
+        InetAddress loopback = InetAddress.getByName(null);
+        InetSocketAddress address = new InetSocketAddress(loopback, 0);
+
+        ConnectionFactory connectionFactory = new ConnectionFactory()
+        {
+            public Connection newConnection(Coordinator coordinator)
+            {
+                return null;
+            }
+        };
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler)
+        {
+            @Override
+            protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+            {
+                return new StandardChannel(channel, coordinator, byteBuffers)
+                {
+                    @Override
+                    public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException
+                    {
+                        try
+                        {
+                            super.register(selector, listener);
+                        }
+                        finally
+                        {
+                            latch.countDown();
+                        }
+                    }
+                };
+            }
+
+            @Override
+            protected void register(Selector selector, Channel channel, Coordinator coordinator)
+            {
+                channel.close();
+                super.register(selector, channel, coordinator);
+            }
+        };
+        int port = serverConnector.listen();
         try
         {
-            InetAddress loopback = InetAddress.getByName(null);
-            InetSocketAddress address = new InetSocketAddress(loopback, 0);
-
-            AsyncInterpreterFactory interpreterFactory = new AsyncInterpreterFactory()
-            {
-                public AsyncInterpreter newAsyncInterpreter(AsyncCoordinator coordinator)
-                {
-                    return null;
-                }
-            };
-
-            final CountDownLatch latch = new CountDownLatch(1);
-            ServerConnector serverConnector = new StandardAsyncServerConnector(address, interpreterFactory, threadPool, new ThreadLocalByteBuffers())
-            {
-                @Override
-                protected AsyncChannel newAsyncChannel(SocketChannel channel, AsyncCoordinator coordinator, ByteBuffers byteBuffers)
-                {
-                    return new StandardAsyncChannel(channel, coordinator, byteBuffers)
-                    {
-                        @Override
-                        public void register(Selector selector, AsyncSelector.Listener listener) throws RuntimeSocketClosedException
-                        {
-                            try
-                            {
-                                super.register(selector, listener);
-                            }
-                            finally
-                            {
-                                latch.countDown();
-                            }
-                        }
-                    };
-                }
-
-                @Override
-                protected void register(AsyncSelector selector, AsyncChannel channel, AsyncCoordinator coordinator)
-                {
-                    channel.close();
-                    super.register(selector, channel, coordinator);
-                }
-            };
-            int port = serverConnector.listen();
+            Socket socket = new Socket(loopback, port);
             try
             {
-                Socket socket = new Socket(loopback, port);
-                try
-                {
-                    // Wait for the AsyncSelector to register the channel
-                    Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                // Wait for the Selector to register the channel
+                Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 
-                    // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).
-                    // Calling socket.isClosed() yields false, socket.isConnected() yields true, so no help.
-                    // Writing on the output stream causes a RST from the server, but this may not be converted to
-                    // a SocketException("Broken Pipe") depending on the TCP buffers on the OS, I think.
-                    // If the write is big enough, eventually SocketException("Broken Pipe") is raised.
-                    // The only reliable way is to read and check if we get -1.
+                // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).
+                // Calling socket.isClosed() yields false, socket.isConnected() yields true, so no help.
+                // Writing on the output stream causes a RST from the server, but this may not be converted to
+                // a SocketException("Broken Pipe") depending on the TCP buffers on the OS, I think.
+                // If the write is big enough, eventually SocketException("Broken Pipe") is raised.
+                // The only reliable way is to read and check if we get -1.
 
-                    int datum = socket.getInputStream().read();
-                    Assert.assertEquals(-1, datum);
-                }
-                finally
-                {
-                    socket.close();
-                }
+                int datum = socket.getInputStream().read();
+                Assert.assertEquals(-1, datum);
             }
             finally
             {
-                serverConnector.close();
+                socket.close();
             }
         }
         finally
         {
-            threadPool.shutdown();
+            serverConnector.close();
+            serverConnector.join(1000L);
         }
     }
 }
