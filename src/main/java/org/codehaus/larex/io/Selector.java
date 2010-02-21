@@ -30,6 +30,8 @@ public interface Selector
 
     public void update(Channel channel, int operations, boolean add);
 
+    public void close(Channel channel);
+
     public void wakeup();
 
     public void close();
@@ -44,23 +46,23 @@ public interface Selector
         /**
          * <p>Invoked when the {@link Selector} first registers with the I/O system.</p>
          */
-        void open();
+        void onOpen();
 
         /**
          * <p>Invoked when the {@link Selector} detects that the I/O system is ready to read.</p>
-         * @see #writeReady()
+         * @see #onWriteReady()
          */
-        public void readReady();
+        public void onReadReady();
 
         /**
          * <p>Invoked when the {@link Selector} detects that the I/O system is ready to write.</p>
-         * @see #readReady()
+         * @see #onReadReady()
          */
-        public void writeReady();
+        public void onWriteReady();
 
         /**
          * <p>Invoked when the {@link Selector} detects that the I/O system is closed.</p>
          */
-        void close();
+        void onClose();
     }
 }

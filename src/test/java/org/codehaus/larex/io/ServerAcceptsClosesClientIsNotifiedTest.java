@@ -16,9 +16,8 @@
 
 package org.codehaus.larex.io;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -26,16 +25,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.codehaus.larex.io.connector.Endpoint;
+import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class AsyncServerConnectorCloseAfterAcceptTest
+public class ServerAcceptsClosesClientIsNotifiedTest
 {
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
@@ -57,8 +59,7 @@ public class AsyncServerConnectorCloseAfterAcceptTest
     @Test
     public void testCloseAfterAccept() throws Exception
     {
-        InetAddress loopback = InetAddress.getByName(null);
-        InetSocketAddress address = new InetSocketAddress(loopback, 0);
+        InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         ConnectionFactory connectionFactory = new ConnectionFactory()
         {
@@ -68,7 +69,7 @@ public class AsyncServerConnectorCloseAfterAcceptTest
             }
         };
 
-        final CountDownLatch latch = new CountDownLatch(1);
+        final CountDownLatch registerLatch = new CountDownLatch(1);
         StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler)
         {
             @Override
@@ -85,7 +86,7 @@ public class AsyncServerConnectorCloseAfterAcceptTest
                         }
                         finally
                         {
-                            latch.countDown();
+                            registerLatch.countDown();
                         }
                     }
                 };
@@ -99,28 +100,43 @@ public class AsyncServerConnectorCloseAfterAcceptTest
             }
         };
         int port = serverConnector.listen();
+
         try
         {
-            Socket socket = new Socket(loopback, port);
-            try
+            final CountDownLatch closeLatch = new CountDownLatch(1);
+            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                // Wait for the Selector to register the channel
-                Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                public StandardConnection newConnection(Coordinator coordinator)
+                {
+                    return new StandardConnection(coordinator)
+                    {
+                        @Override
+                        protected void read(ByteBuffer buffer)
+                        {
+                        }
 
-                // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).
-                // Calling socket.isClosed() yields false, socket.isConnected() yields true, so no help.
-                // Writing on the output stream causes a RST from the server, but this may not be converted to
-                // a SocketException("Broken Pipe") depending on the TCP buffers on the OS, I think.
-                // If the write is big enough, eventually SocketException("Broken Pipe") is raised.
-                // The only reliable way is to read and check if we get -1.
+                        @Override
+                        public void onRemoteClose()
+                        {
+                            closeLatch.countDown();
+                        }
+                    };
+                }
+            });
+            endpoint.connect(new InetSocketAddress("localhost", port));
 
-                int datum = socket.getInputStream().read();
-                Assert.assertEquals(-1, datum);
-            }
-            finally
-            {
-                socket.close();
-            }
+            // Wait for the Selector to register the channel
+            assertTrue(registerLatch.await(1000, TimeUnit.MILLISECONDS));
+
+            // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).
+            // Calling socket.isClosed() yields false, socket.isConnected() yields true, so no help.
+            // Writing on the output stream causes a RST from the server, but this may not be converted to
+            // a SocketException("Broken Pipe") depending on the TCP buffers on the OS, I think.
+            // If the write is big enough, eventually SocketException("Broken Pipe") is raised.
+            // The only reliable way is to read and check if we get -1.
+
+            assertTrue(closeLatch.await(1000, TimeUnit.MILLISECONDS));
         }
         finally
         {

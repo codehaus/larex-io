@@ -28,14 +28,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class AsyncServerConnectorAcceptTest
+public class ServerAcceptsTest
 {
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
@@ -55,7 +56,7 @@ public class AsyncServerConnectorAcceptTest
     }
 
     @Test
-    public void testBlockingAccept() throws Exception
+    public void testAcceptIsBlocking() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
@@ -69,12 +70,13 @@ public class AsyncServerConnectorAcceptTest
             }
         };
         int port = serverConnector.listen();
+
         try
         {
             Socket socket = new Socket(address.getHostName(), port);
             try
             {
-                Assert.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
             }
             finally
             {

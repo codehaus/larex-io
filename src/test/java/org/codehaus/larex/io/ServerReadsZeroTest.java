@@ -17,10 +17,7 @@
 package org.codehaus.larex.io;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
@@ -31,16 +28,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.codehaus.larex.io.connector.Endpoint;
+import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class AsyncServerConnectorWriteZeroTest
+public class ServerReadsZeroTest
 {
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
@@ -60,22 +61,27 @@ public class AsyncServerConnectorWriteZeroTest
     }
 
     @Test
-    public void testWriteZero() throws Exception
+    public void testReadZero() throws Exception
     {
+        final CountDownLatch latch = new CountDownLatch(1);
         ConnectionFactory connectionFactory = new ConnectionFactory()
         {
-            public Connection newConnection(final Coordinator coordinator)
+            public Connection newConnection(Coordinator coordinator)
             {
-                return new EchoConnection(coordinator);
+                return new StandardConnection(coordinator)
+                {
+                    @Override
+                    protected void read(ByteBuffer buffer)
+                    {
+                        latch.countDown();
+                    }
+                };
             }
         };
 
-        final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicInteger writes = new AtomicInteger();
-        final AtomicInteger needWrites = new AtomicInteger();
-        InetAddress loopback = InetAddress.getByName(null);
-        InetSocketAddress address = new InetSocketAddress(loopback, 0);
-
+        final AtomicInteger reads = new AtomicInteger();
+        final AtomicInteger needReads = new AtomicInteger();
+        InetSocketAddress address = new InetSocketAddress("localhost", 0);
         StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler)
         {
             @Override
@@ -83,29 +89,19 @@ public class AsyncServerConnectorWriteZeroTest
             {
                 return new StandardChannel(channel, coordinator, byteBuffers)
                 {
-                    private final AtomicInteger writes = new AtomicInteger();
+                    private final AtomicInteger reads = new AtomicInteger();
 
                     @Override
-                    protected int writeAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
+                    protected boolean readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
                     {
-                        if (this.writes.compareAndSet(0, 1))
+                        if (this.reads.compareAndSet(0, 1))
                         {
-                            // In the first aggressive write, we simulate a zero bytes write
-                            return 0;
-                        }
-                        else if (this.writes.compareAndSet(1, 2))
-                        {
-                            // In the second aggressive write, simulate 1 byte write
-                            ByteBuffer newBuffer = ByteBuffer.allocate(1);
-                            newBuffer.put(buffer.get());
-                            channel.write(newBuffer);
-                            return newBuffer.capacity();
+                            // In the first greedy read, we simulate a zero bytes read
+                            return false;
                         }
                         else
                         {
-                            int result = super.writeAggressively(channel, buffer);
-                            latch.countDown();
-                            return result;
+                            return super.readAggressively(channel, buffer);
                         }
                     }
                 };
@@ -117,44 +113,57 @@ public class AsyncServerConnectorWriteZeroTest
                 return new StandardCoordinator(selector, threadPool)
                 {
                     @Override
-                    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
+                    public void onRead(ByteBuffer bytes)
                     {
-                        writes.incrementAndGet();
-                        return super.write(buffer);
+                        reads.incrementAndGet();
+                        super.onRead(bytes);
                     }
 
                     @Override
-                    public void needsWrite(boolean needsWrite)
+                    public void needsRead(boolean needsRead)
                     {
-                        needWrites.incrementAndGet();
-                        super.needsWrite(needsWrite);
+                        needReads.incrementAndGet();
+                        super.needsRead(needsRead);
                     }
                 };
             }
         };
         int port = serverConnector.listen();
+
         try
         {
-            Socket socket = new Socket(loopback, port);
+            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            {
+                public StandardConnection newConnection(Coordinator coordinator)
+                {
+                    return new StandardConnection(coordinator)
+                    {
+                        @Override
+                        protected void read(ByteBuffer buffer)
+                        {
+                        }
+                    };
+                }
+            });
+            StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
             try
             {
-                OutputStream output = socket.getOutputStream();
-                byte[] bytes = "HELLO".getBytes("UTF-8");
-                output.write(bytes);
-                output.flush();
+                ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
+                connection.write(buffer);
+                assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 
-                Assert.assertTrue(latch.await(5000, TimeUnit.MILLISECONDS));
+                // One read call, since with 0 bytes read we don't call it
+                assertEquals(1, reads.get());
 
-                // Three write calls from the connection
-                Assert.assertEquals(3, writes.get());
-                // Four needsWrite calls:
-                // after writing 0 bytes to enable the writes, then to disable;
-                // after writing 1 byte to enable the writes, then to disable
-                Assert.assertEquals(4, needWrites.get());
+                // Five needsRead calls: at beginning to enable the reads, then to disable
+                // after reading 0 to re-enable the reads, and again to disable
+                // then to re-enable them
+                assertEquals(5, needReads.get());
             }
             finally
             {
-                socket.close();
+                connection.close();
             }
         }
         finally

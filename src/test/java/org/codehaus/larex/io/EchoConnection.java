@@ -33,4 +33,12 @@ public class EchoConnection extends StandardConnection
     {
         write(buffer);
     }
+
+    public static class Factory implements ConnectionFactory<EchoConnection>
+    {
+        public EchoConnection newConnection(Coordinator coordinator)
+        {
+            return new EchoConnection(coordinator);
+        }
+    }
 }

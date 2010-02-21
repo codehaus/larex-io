@@ -69,7 +69,7 @@ public class ClientClosesServerIsNotifiedTest
                     }
 
                     @Override
-                    protected void closed()
+                    public void onRemoteClose()
                     {
                         closeLatch.countDown();
                     }

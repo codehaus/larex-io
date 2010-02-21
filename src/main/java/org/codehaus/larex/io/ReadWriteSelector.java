@@ -70,13 +70,13 @@ public class ReadWriteSelector implements Selector
 
     public void register(Channel channel, Listener listener)
     {
-        tasks.add(new Register(selector, channel, listener));
+        tasks.add(new RegisterChannel(selector, channel, listener));
         wakeup();
     }
 
     public void update(Channel channel, int operations, boolean add)
     {
-        Update task = new Update(channel, operations, add);
+        UpdateChannel task = new UpdateChannel(channel, operations, add);
         if (Thread.currentThread() == thread)
         {
             task.run();
@@ -86,6 +86,12 @@ public class ReadWriteSelector implements Selector
             tasks.add(task);
             wakeup();
         }
+    }
+
+    public void close(Channel channel)
+    {
+        tasks.add(new CloseChannel(channel));
+        wakeup();
     }
 
     public void wakeup()
@@ -120,22 +126,22 @@ public class ReadWriteSelector implements Selector
         if (selectedKey.isReadable())
         {
             Listener listener = (Listener)selectedKey.attachment();
-            listener.readReady();
+            listener.onReadReady();
         }
         else if (selectedKey.isWritable())
         {
             Listener listener = (Listener)selectedKey.attachment();
-            listener.writeReady();
+            listener.onWriteReady();
         }
     }
 
-    private class Register implements Runnable
+    private class RegisterChannel implements Runnable
     {
         private final java.nio.channels.Selector selector;
         private final Channel channel;
         private final Listener listener;
 
-        private Register(java.nio.channels.Selector selector, Channel channel, Listener listener)
+        private RegisterChannel(java.nio.channels.Selector selector, Channel channel, Listener listener)
         {
             this.selector = selector;
             this.channel = channel;
@@ -147,7 +153,7 @@ public class ReadWriteSelector implements Selector
             try
             {
                 channel.register(selector, listener);
-                listener.open();
+                listener.onOpen();
             }
             catch (RuntimeSocketClosedException x)
             {
@@ -156,13 +162,13 @@ public class ReadWriteSelector implements Selector
         }
     }
 
-    private class Update implements Runnable
+    private class UpdateChannel implements Runnable
     {
         private final Channel channel;
         private final int operations;
         private final boolean add;
 
-        public Update(Channel channel, int operations, boolean add)
+        public UpdateChannel(Channel channel, int operations, boolean add)
         {
             this.channel = channel;
             this.operations = operations;
@@ -182,6 +188,21 @@ public class ReadWriteSelector implements Selector
         }
     }
 
+    private class CloseChannel implements Runnable
+    {
+        private final Channel channel;
+
+        private CloseChannel(Channel channel)
+        {
+            this.channel = channel;
+        }
+
+        public void run()
+        {
+            channel.close();
+        }
+    }
+
     private class Close implements Runnable
     {
         public void run()
@@ -189,7 +210,7 @@ public class ReadWriteSelector implements Selector
             for (SelectionKey key : selector.keys())
             {
                 Listener listener = (Listener)key.attachment();
-                listener.close();
+                listener.onClose();
             }
 
             try

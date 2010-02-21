@@ -68,7 +68,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
 
         synchronized (this)
         {
-            if (state == State.CLOSED)
+            if (state == State.REMOTE_CLOSE)
                 return -1;
 
             this.buffer = buffer;
@@ -94,7 +94,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
                     throw new RuntimeSocketTimeoutException();
                 else if (state == State.CLOSE)
                     throw new RuntimeSocketClosedException();
-                else if (state == State.CLOSED)
+                else if (state == State.REMOTE_CLOSE)
                     return -1;
             }
         }
@@ -102,11 +102,11 @@ public abstract class BlockingConnection extends AbstractConnection implements R
         return buffer.position() - start;
     }
 
-    public void onClosed()
+    public void onRemoteClose()
     {
         synchronized (this)
         {
-            state = State.CLOSED;
+            state = State.REMOTE_CLOSE;
             notify();
         }
         super.close();
@@ -125,6 +125,6 @@ public abstract class BlockingConnection extends AbstractConnection implements R
 
     private enum State
     {
-        READ, WAIT, TIMEOUT, CLOSED, CLOSE
+        READ, WAIT, TIMEOUT, REMOTE_CLOSE, CLOSE
     }
 }

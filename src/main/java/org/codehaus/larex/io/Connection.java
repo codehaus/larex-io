@@ -39,5 +39,7 @@ public interface Connection
 
     void onWriteTimeout();
 
-    void onClosed();
+    void onRemoteClose();
+
+    void onClose();
 }

@@ -82,12 +82,12 @@ public class StandardCoordinator implements Coordinator
         this.readBufferSize = size;
     }
 
-    public void open()
+    public void onOpen()
     {
         connection.onOpen();
     }
 
-    public void readReady()
+    public void onReadReady()
     {
         // Remove interest in further reads, otherwise the select loop will
         // continue to notify us that it is ready to read
@@ -96,7 +96,7 @@ public class StandardCoordinator implements Coordinator
         threadPool.execute(readCommand);
     }
 
-    public void writeReady()
+    public void onWriteReady()
     {
         // Remove interest in further writes, otherwise the select loop will
         // continue to notify us that it is ready to write
@@ -125,14 +125,41 @@ public class StandardCoordinator implements Coordinator
         return channel.write(buffer);
     }
 
-    public void close()
-    {
-        channel.close();
-    }
-
     public void onClose()
     {
-        connection.onClosed();
+        try
+        {
+            connection.onClose();
+        }
+        catch (Exception x)
+        {
+            logger.info("Unexpected exception", x);
+        }
+        finally
+        {
+            close();
+        }
+    }
+
+    public void onRemoteClose()
+    {
+        try
+        {
+            connection.onRemoteClose();
+        }
+        catch (Exception x)
+        {
+            logger.info("Unexpected exception", x);
+        }
+        finally
+        {
+            close();
+        }
+    }
+
+    public void close()
+    {
+        selector.close(channel);
     }
 
     private class ReadCommand implements Runnable

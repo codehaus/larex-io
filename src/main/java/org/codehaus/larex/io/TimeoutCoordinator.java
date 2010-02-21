@@ -43,19 +43,19 @@ public class TimeoutCoordinator extends StandardCoordinator
     }
 
     @Override
-    public void readReady()
+    public void onReadReady()
     {
         if (readTimeoutTask != null)
             readTimeoutTask.cancel(false);
-        super.readReady();
+        super.onReadReady();
     }
 
     @Override
-    public void writeReady()
+    public void onWriteReady()
     {
         if (writeTimeoutTask != null)
             writeTimeoutTask.cancel(false);
-        super.writeReady();
+        super.onWriteReady();
     }
 
     @Override

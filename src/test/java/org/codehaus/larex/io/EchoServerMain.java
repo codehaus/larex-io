@@ -41,14 +41,7 @@ public class EchoServerMain
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-        ConnectionFactory connectionFactory = new ConnectionFactory()
-        {
-            public Connection newConnection(Coordinator coordinator)
-            {
-                return new EchoConnection(coordinator);
-            }
-        };
-        StandardServerConnector connector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler);
+        StandardServerConnector connector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler);
         connector.listen();
     }
 }

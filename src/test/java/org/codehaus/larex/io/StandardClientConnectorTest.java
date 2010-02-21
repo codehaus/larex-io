@@ -62,16 +62,8 @@ public class StandardClientConnectorTest
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
-        ConnectionFactory serverConnectionFactory = new ConnectionFactory()
-        {
-            public Connection newConnection(Coordinator coordinator)
-            {
-                return new EchoConnection(coordinator);
-            }
-        };
-
         final CountDownLatch acceptLatch = new CountDownLatch(1);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, serverConnectionFactory, threadPool, scheduler)
+        StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler)
         {
             @Override
             protected void accepted(SocketChannel channel) throws IOException

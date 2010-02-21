@@ -104,7 +104,7 @@ public class ServerWritesClosesClientIsNotifiedTest
                     }
 
                     @Override
-                    protected void closed()
+                    public void onRemoteClose()
                     {
                         if (!tester.compareAndSet(1, 2))
                             failure.set(2);

@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
 public class StandardChannel implements Channel
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
+    private final boolean debug = logger.isDebugEnabled();
     private final SocketChannel channel;
     private final Coordinator coordinator;
     private final ByteBuffers byteBuffers;
     private volatile int readAggressiveness = 2;
     private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
-    private Thread writer;
 
     public StandardChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
     {
@@ -89,7 +89,8 @@ public class StandardChannel implements Channel
             else
                 selectionKey.interestOps(oldOperations & ~operations);
             int newOperations = selectionKey.interestOps();
-            logger.debug("Channel {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
+            if (debug)
+                logger.debug("Channel {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
         }
         catch (CancelledKeyException x)
         {
@@ -112,7 +113,8 @@ public class StandardChannel implements Channel
 
                 if (read > 0)
                 {
-                    logger.debug("Channel {} read {} bytes into {}", new Object[]{this, read, buffer});
+                    if (debug)
+                        logger.debug("Channel {} read {} bytes into {}", new Object[]{this, read, buffer});
                     buffer.flip();
                     coordinator.onRead(buffer);
                 }
@@ -124,8 +126,9 @@ public class StandardChannel implements Channel
 
             if (closed)
             {
-                logger.debug("Channel {} closed remotely", this);
-                coordinator.onClose();
+                if (debug)
+                    logger.debug("Channel {} closed remotely", this);
+                coordinator.onRemoteClose();
             }
             else if (read == 0)
             {
@@ -136,13 +139,13 @@ public class StandardChannel implements Channel
         catch (ClosedChannelException x)
         {
             logger.debug("Channel closed during read");
-            close();
+            coordinator.onClose();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
             logger.debug("Unexpected IOException", x);
-            close();
+            coordinator.onClose();
             throw new RuntimeIOException(x);
         }
     }
@@ -168,13 +171,13 @@ public class StandardChannel implements Channel
         catch (ClosedChannelException x)
         {
             logger.debug("Channel closed during write of {} bytes", buffer.remaining());
-            close();
+            coordinator.onClose();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
             logger.debug("Unexpected IOException", x);
-            close();
+            coordinator.onClose();
             throw new RuntimeIOException(x);
         }
     }
@@ -200,7 +203,8 @@ public class StandardChannel implements Channel
             if (selectionKey != null)
                 selectionKey.cancel();
 
-            logger.debug("Channel {} closing", this);
+            if (debug)
+                logger.debug("Channel {} closing", this);
             channel.close();
         }
         catch (IOException x)

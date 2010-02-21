@@ -35,8 +35,18 @@ public abstract class StandardConnection extends AbstractConnection
 
     public void onRead(ByteBuffer buffer)
     {
-        read(buffer);
-        getCoordinator().needsRead(true);
+        try
+        {
+            read(buffer);
+        }
+        catch (Exception x)
+        {
+            logger.info("Unexpected exception, closing connection", x);
+        }
+        finally
+        {
+            getCoordinator().needsRead(true);
+        }
     }
 
     public void onReadTimeout()
@@ -44,14 +54,4 @@ public abstract class StandardConnection extends AbstractConnection
     }
 
     protected abstract void read(ByteBuffer buffer);
-
-    public void onClosed()
-    {
-        closed();
-        close();
-    }
-
-    protected void closed()
-    {
-    }
 }

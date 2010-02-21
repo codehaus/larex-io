@@ -23,11 +23,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * <p>Partial implementation of {@link Connection}, that provides:</p>
+ * <ul>
+ * <li>a blocking write facility via the {@link #write(ByteBuffer)} method</li>
+ * <li>a close facility via the {@link #close()} method</li>
+ * </ul>
+ *
  * @version $Revision$ $Date$
  */
 public abstract class AbstractConnection implements Connection
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
+    protected final boolean debug = logger.isDebugEnabled();
     private final Coordinator coordinator;
     private State state = State.WRITE;
 
@@ -67,12 +74,22 @@ public abstract class AbstractConnection implements Connection
         }
     }
 
-    public void write(ByteBuffer buffer)
+    /**
+     * <p>Writes the bytes contained in the given buffer.</p>
+     * <p>This call is blocking and will only return when all the bytes have been written,
+     * the write timeout expires, or the connection is closed.</p>
+     *
+     * @param buffer the buffer to write
+     * @throws RuntimeSocketTimeoutException if the write timeout expires
+     * @throws RuntimeSocketClosedException  if the connection is closed
+     */
+    public void write(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
     {
         while (buffer.hasRemaining())
         {
             int written = coordinator.write(buffer);
-            logger.debug("{} wrote {} bytes", this, written);
+            if (debug)
+                logger.debug("{} wrote {} bytes", this, written);
 
             if (buffer.hasRemaining())
             {
@@ -92,9 +109,11 @@ public abstract class AbstractConnection implements Connection
                     {
                         try
                         {
-                            logger.debug("Writer thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
+                            if (debug)
+                                logger.debug("Writer thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                             wait();
-                            logger.debug("Writer thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
+                            if (debug)
+                                logger.debug("Writer thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                         }
                         catch (InterruptedException x)
                         {
@@ -114,6 +133,18 @@ public abstract class AbstractConnection implements Connection
         }
     }
 
+    public void onRemoteClose()
+    {
+    }
+
+    public void onClose()
+    {
+    }
+
+    /**
+     * <p>Closes this connection.</p>
+     * <p>If a call to {@link #write(ByteBuffer)} is currently blocked, it will be woken up.</p>
+     */
     public void close()
     {
         synchronized (this)
