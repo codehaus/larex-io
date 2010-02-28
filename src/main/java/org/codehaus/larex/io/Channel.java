@@ -49,5 +49,7 @@ public interface Channel
 
     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 
+    public void close(CloseType type);
+
     public void close();
 }

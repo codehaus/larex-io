@@ -70,8 +70,7 @@ public class ReadWriteSelector implements Selector
 
     public void register(Channel channel, Listener listener)
     {
-        tasks.add(new RegisterChannel(selector, channel, listener));
-        wakeup();
+        addTask(new RegisterChannel(selector, channel, listener));
     }
 
     public void update(Channel channel, int operations, boolean add)
@@ -83,26 +82,29 @@ public class ReadWriteSelector implements Selector
         }
         else
         {
-            tasks.add(task);
-            wakeup();
+            addTask(task);
         }
     }
 
-    public void close(Channel channel)
+    public void close()
     {
-        tasks.add(new CloseChannel(channel));
-        wakeup();
+        addTask(new Close());
+    }
+
+    protected boolean addTask(Runnable task)
+    {
+        boolean result = tasks.add(task);
+        if (result)
+        {
+            logger.debug("Added task {}", task);
+            wakeup();
+        }
+        return result;
     }
 
     public void wakeup()
     {
         selector.wakeup();
-    }
-
-    public void close()
-    {
-        tasks.add(new Close());
-        wakeup();
     }
 
     public boolean join(long timeout) throws InterruptedException
@@ -185,21 +187,6 @@ public class ReadWriteSelector implements Selector
             {
                 logger.debug("Ignoring update for closed channel {}", channel);
             }
-        }
-    }
-
-    private class CloseChannel implements Runnable
-    {
-        private final Channel channel;
-
-        private CloseChannel(Channel channel)
-        {
-            this.channel = channel;
-        }
-
-        public void run()
-        {
-            channel.close();
         }
     }
 

@@ -89,11 +89,15 @@ public interface Coordinator extends Selector.Listener
 
     /**
      * <p>Closes this coordinator and the associated channel.</p>
-     * @see Channel#close()
+     * @see Channel#close(CloseType)
      */
     public void onClose();
 
     public void onRemoteClose();
 
+    public void close(CloseType type);
+
     public void close();
+
+    public void onClosed();
 }

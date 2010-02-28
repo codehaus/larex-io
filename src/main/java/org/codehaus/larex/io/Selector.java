@@ -30,11 +30,9 @@ public interface Selector
 
     public void update(Channel channel, int operations, boolean add);
 
-    public void close(Channel channel);
+    public void close();
 
     public void wakeup();
-
-    public void close();
 
     public boolean join(long timeout) throws InterruptedException;
 

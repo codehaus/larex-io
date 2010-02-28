@@ -28,10 +28,11 @@ import org.slf4j.LoggerFactory;
  */
 public class StandardCoordinator implements Coordinator
 {
-    private final Logger logger = LoggerFactory.getLogger(getClass());
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
     private final Selector selector;
     private final Executor threadPool;
     private final Runnable readCommand = new ReadCommand();
+    private final Runnable closingCommand = new ClosingCommand();
     private volatile Channel channel;
     private volatile Connection connection;
     private volatile int readBufferSize = 1024;
@@ -52,7 +53,7 @@ public class StandardCoordinator implements Coordinator
         return threadPool;
     }
 
-    protected Channel getAsyncChannel()
+    protected Channel getChannel()
     {
         return channel;
     }
@@ -127,18 +128,12 @@ public class StandardCoordinator implements Coordinator
 
     public void onClose()
     {
-        try
-        {
-            connection.onClose();
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
-        }
-        finally
-        {
-            close();
-        }
+        threadPool.execute(closingCommand);
+    }
+
+    protected void onClosing()
+    {
+        connection.onClosing();
     }
 
     public void onRemoteClose()
@@ -157,9 +152,24 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
+    public void close(CloseType type)
+    {
+        channel.close(type);
+    }
+
     public void close()
     {
-        selector.close(channel);
+        channel.close();
+    }
+
+    public void onClosed()
+    {
+        connection.onClosed();
+    }
+
+    protected void read()
+    {
+        channel.read(readBufferSize);
     }
 
     private class ReadCommand implements Runnable
@@ -168,11 +178,34 @@ public class StandardCoordinator implements Coordinator
         {
             try
             {
-                channel.read(readBufferSize);
+                read();
             }
             catch (RuntimeSocketClosedException x)
             {
-                logger.debug("Could not read, channel has been closed");
+                logger.debug("Could not read, channel has been closed", x);
+            }
+            catch (RuntimeIOException x)
+            {
+                logger.debug("Could not read", x);
+            }
+        }
+    }
+
+    private class ClosingCommand implements Runnable
+    {
+        public void run()
+        {
+            try
+            {
+                onClosing();
+            }
+            catch (Exception x)
+            {
+                logger.info("Unexpected exception", x);
+            }
+            finally
+            {
+                close();
             }
         }
     }

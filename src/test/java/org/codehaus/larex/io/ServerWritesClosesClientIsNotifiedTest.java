@@ -114,10 +114,15 @@ public class ServerWritesClosesClientIsNotifiedTest
             }
         }).connect(new InetSocketAddress(address.getHostName(), port));
 
-        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
-        assertEquals(2, tester.get());
-        assertEquals(0, failure.get());
-
-        connection.close();
+        try
+        {
+            assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+            assertEquals(2, tester.get());
+            assertEquals(0, failure.get());
+        }
+        finally
+        {
+            connection.close();
+        }
     }
 }

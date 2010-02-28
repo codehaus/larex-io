@@ -54,7 +54,7 @@ public class ClientClosesServerIsNotifiedTest
     }
 
     @Test
-    public void testClientClosesServerReadsMinusOne() throws Exception
+    public void testClientClosesServerIsNotified() throws Exception
     {
         final CountDownLatch closeLatch = new CountDownLatch(1);
         StandardServerConnector serverConnector = new StandardServerConnector(new InetSocketAddress("localhost", 0), new ConnectionFactory()

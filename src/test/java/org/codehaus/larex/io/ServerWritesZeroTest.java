@@ -104,7 +104,7 @@ public class ServerWritesZeroTest
             }
 
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool)
+            protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
             {
                 return new StandardCoordinator(selector, threadPool)
                 {
@@ -129,26 +129,14 @@ public class ServerWritesZeroTest
         try
         {
             StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
-            {
-                public StandardConnection newConnection(Coordinator coordinator)
-                {
-                    return new StandardConnection(coordinator)
-                    {
-                        @Override
-                        protected void read(ByteBuffer buffer)
-                        {
-                        }
-                    };
-                }
-            });
+            Endpoint<IdleConnection> endpoint = connector.newEndpoint(new IdleConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
             try
             {
                 ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
                 connection.write(buffer);
 
-                assertTrue(latch.await(5000, TimeUnit.MILLISECONDS));
+                assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 
                 // Three write calls from the connection
                 assertEquals(3, writes.get());
@@ -159,7 +147,7 @@ public class ServerWritesZeroTest
             }
             finally
             {
-                connection.close();
+                connection.softClose(1000);
             }
         }
         finally

@@ -19,44 +19,25 @@ package org.codehaus.larex.io;
 import java.nio.ByteBuffer;
 
 /**
- * @version $Revision$ $Date$
+ * @version $Revision: 903 $ $Date$
  */
-public abstract class StandardConnection extends AbstractConnection
+public class IdleConnection extends StandardConnection
 {
-    public StandardConnection(Coordinator coordinator)
+    public IdleConnection(Coordinator coordinator)
     {
         super(coordinator);
     }
 
-    public final void onOpen()
-    {
-        getCoordinator().needsRead(true);
-        onOpenHook();
-    }
-
-    protected void onOpenHook()
+    @Override
+    protected void read(ByteBuffer buffer)
     {
     }
 
-    public void onRead(ByteBuffer buffer)
+    public static class Factory implements ConnectionFactory<IdleConnection>
     {
-        try
+        public IdleConnection newConnection(Coordinator coordinator)
         {
-            read(buffer);
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
-        }
-        finally
-        {
-            getCoordinator().needsRead(true);
+            return new IdleConnection(coordinator);
         }
     }
-
-    public void onReadTimeout()
-    {
-    }
-
-    protected abstract void read(ByteBuffer buffer);
 }

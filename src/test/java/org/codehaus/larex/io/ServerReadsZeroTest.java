@@ -108,7 +108,7 @@ public class ServerReadsZeroTest
             }
 
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool)
+            protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
             {
                 return new StandardCoordinator(selector, threadPool)
                 {
@@ -133,19 +133,7 @@ public class ServerReadsZeroTest
         try
         {
             StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
-            {
-                public StandardConnection newConnection(Coordinator coordinator)
-                {
-                    return new StandardConnection(coordinator)
-                    {
-                        @Override
-                        protected void read(ByteBuffer buffer)
-                        {
-                        }
-                    };
-                }
-            });
+            Endpoint<IdleConnection> endpoint = connector.newEndpoint(new IdleConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
             try
             {
@@ -163,7 +151,7 @@ public class ServerReadsZeroTest
             }
             finally
             {
-                connection.close();
+                connection.softClose(1000);
             }
         }
         finally

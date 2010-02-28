@@ -41,5 +41,7 @@ public interface Connection
 
     void onRemoteClose();
 
-    void onClose();
+    void onClosing();
+
+    void onClosed();
 }

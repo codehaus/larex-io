@@ -102,25 +102,29 @@ public abstract class BlockingConnection extends AbstractConnection implements R
         return buffer.position() - start;
     }
 
-    public void onRemoteClose()
+    public final void onRemoteClose()
     {
         synchronized (this)
         {
             state = State.REMOTE_CLOSE;
             notify();
         }
-        super.close();
+        onRemoteCloseHook();
+    }
+
+    protected void onRemoteCloseHook()
+    {
     }
 
     @Override
-    public void close()
+    public void close(CloseType type)
     {
         synchronized (this)
         {
             state = State.CLOSE;
             notify();
         }
-        super.close();
+        super.close(type);
     }
 
     private enum State

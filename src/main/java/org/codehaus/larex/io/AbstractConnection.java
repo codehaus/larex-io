@@ -18,6 +18,8 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,7 @@ public abstract class AbstractConnection implements Connection
     protected final boolean debug = logger.isDebugEnabled();
     private final Coordinator coordinator;
     private State state = State.WRITE;
+    private volatile CountDownLatch softClose;
 
     public AbstractConnection(Coordinator coordinator)
     {
@@ -56,22 +59,32 @@ public abstract class AbstractConnection implements Connection
         return result;
     }
 
-    public void onWrite()
+    public final void onWrite()
     {
         synchronized (this)
         {
             state = State.WRITE;
             notify();
         }
+        onWriteHook();
     }
 
-    public void onWriteTimeout()
+    protected void onWriteHook()
+    {
+    }
+
+    public final void onWriteTimeout()
     {
         synchronized (this)
         {
             state = State.TIMEOUT;
             notify();
         }
+        onWriteTimeoutHook();
+    }
+
+    protected void onWriteTimeoutHook()
+    {
     }
 
     /**
@@ -137,14 +150,37 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    public void onClose()
+    public void onClosing()
+    {
+    }
+
+    public final void onClosed()
+    {
+        CountDownLatch softClose = this.softClose;
+        if (softClose != null)
+            softClose.countDown();
+        onClosedHook();
+    }
+
+    protected void onClosedHook()
     {
     }
 
     /**
      * <p>Closes this connection.</p>
      * <p>If a call to {@link #write(ByteBuffer)} is currently blocked, it will be woken up.</p>
+     * @param type how to close this connection
      */
+    public void close(CloseType type)
+    {
+        synchronized (this)
+        {
+            state = State.CLOSE;
+            notify();
+        }
+        coordinator.close(type);
+    }
+
     public void close()
     {
         synchronized (this)
@@ -153,6 +189,17 @@ public abstract class AbstractConnection implements Connection
             notify();
         }
         coordinator.close();
+    }
+
+    public boolean softClose(long timeout) throws InterruptedException
+    {
+        softClose = new CountDownLatch(1);
+        close(CloseType.OUTPUT);
+        boolean result = softClose.await(timeout, TimeUnit.MILLISECONDS);
+        softClose = null;
+        if (!result)
+            close();
+        return result;
     }
 
     private enum State

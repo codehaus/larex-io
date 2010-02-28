@@ -69,9 +69,9 @@ public class StandardChannel implements Channel
 
     public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException
     {
-	    try
-		{
-	        selectionKey = channel.register(selector, 0, listener);
+        try
+        {
+            selectionKey = channel.register(selector, 0, listener);
         }
         catch (ClosedChannelException x)
         {
@@ -126,9 +126,17 @@ public class StandardChannel implements Channel
 
             if (closed)
             {
-                if (debug)
-                    logger.debug("Channel {} closed remotely", this);
-                coordinator.onRemoteClose();
+                if (!channel.socket().isInputShutdown())
+                {
+                    if (debug)
+                        logger.debug("Channel {} closed remotely", this);
+                    coordinator.onRemoteClose();
+                }
+                else
+                {
+                    // Input was explicitly closed
+                    throw new RuntimeSocketClosedException();
+                }
             }
             else if (read == 0)
             {
@@ -138,14 +146,12 @@ public class StandardChannel implements Channel
         }
         catch (ClosedChannelException x)
         {
-            logger.debug("Channel closed during read");
-            coordinator.onClose();
+            close();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
-            logger.debug("Unexpected IOException", x);
-            coordinator.onClose();
+            close();
             throw new RuntimeIOException(x);
         }
     }
@@ -171,13 +177,13 @@ public class StandardChannel implements Channel
         catch (ClosedChannelException x)
         {
             logger.debug("Channel closed during write of {} bytes", buffer.remaining());
-            coordinator.onClose();
+            close();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
             logger.debug("Unexpected IOException", x);
-            coordinator.onClose();
+            close();
             throw new RuntimeIOException(x);
         }
     }
@@ -193,6 +199,34 @@ public class StandardChannel implements Channel
         return result;
     }
 
+    public void close(CloseType type)
+    {
+        if (!channel.isOpen())
+            return;
+
+        if (debug)
+            logger.debug("Channel {} closing {}", this, type);
+
+        try
+        {
+            switch (type)
+            {
+                case INPUT:
+                    channel.socket().shutdownInput();
+                    break;
+                case OUTPUT:
+                    channel.socket().shutdownOutput();
+                    break;
+                default:
+                    throw new IllegalStateException();
+            }
+        }
+        catch (IOException x)
+        {
+            throw new RuntimeIOException(x);
+        }
+    }
+
     public void close()
     {
         if (!channel.isOpen())
@@ -205,11 +239,16 @@ public class StandardChannel implements Channel
 
             if (debug)
                 logger.debug("Channel {} closing", this);
+
             channel.close();
         }
         catch (IOException x)
         {
             throw new RuntimeIOException(x);
+        }
+        finally
+        {
+            coordinator.onClosed();
         }
     }
 

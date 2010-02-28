@@ -20,6 +20,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @version $Revision$ $Date$
@@ -29,7 +30,9 @@ public class TimeoutCoordinator extends StandardCoordinator
     private final ScheduledExecutorService scheduler;
     private final long readTimeout;
     private final long writeTimeout;
+    private final Runnable readTimeoutAction = new ReadTimeoutAction();
     private final Runnable readTimeoutCommand = new ReadTimeoutCommand();
+    private final AtomicReference<ReadState> readState = new AtomicReference<ReadState>(ReadState.WAIT);
     private final Runnable writeTimeoutCommand = new WriteTimeoutCommand();
     private volatile ScheduledFuture<?> readTimeoutTask;
     private volatile ScheduledFuture<?> writeTimeoutTask;
@@ -45,16 +48,18 @@ public class TimeoutCoordinator extends StandardCoordinator
     @Override
     public void onReadReady()
     {
-        if (readTimeoutTask != null)
-            readTimeoutTask.cancel(false);
+        ScheduledFuture<?> task = readTimeoutTask;
+        if (task != null)
+            task.cancel(false);
         super.onReadReady();
     }
 
     @Override
     public void onWriteReady()
     {
-        if (writeTimeoutTask != null)
-            writeTimeoutTask.cancel(false);
+        ScheduledFuture<?> task = writeTimeoutTask;
+        if (task != null)
+            task.cancel(false);
         super.onWriteReady();
     }
 
@@ -62,7 +67,7 @@ public class TimeoutCoordinator extends StandardCoordinator
     public void needsRead(boolean needsRead)
     {
         if (needsRead && readTimeout > 0)
-            readTimeoutTask = scheduler.schedule(readTimeoutCommand, readTimeout, TimeUnit.MILLISECONDS);
+            readTimeoutTask = scheduler.schedule(readTimeoutAction, readTimeout, TimeUnit.MILLISECONDS);
         super.needsRead(needsRead);
     }
 
@@ -74,18 +79,71 @@ public class TimeoutCoordinator extends StandardCoordinator
         super.needsWrite(needsWrite);
     }
 
+    @Override
+    protected void read()
+    {
+        // Notify reads in any case
+        boolean reading = readState.compareAndSet(ReadState.WAIT, ReadState.READ);
+        try
+        {
+            super.read();
+        }
+        finally
+        {
+            if (reading)
+                readState.compareAndSet(ReadState.READ, ReadState.WAIT);
+        }
+    }
+
+    protected void onReadTimeout()
+    {
+        // Skip notification of read timeout in case a concurrent read happens
+        if (readState.compareAndSet(ReadState.WAIT, ReadState.TIMEOUT))
+        {
+            try
+            {
+                logger.debug("Notifying read timeout");
+                getConnection().onReadTimeout();
+            }
+            finally
+            {
+                readState.compareAndSet(ReadState.TIMEOUT, ReadState.WAIT);
+            }
+        }
+    }
+
+    protected void onWriteTimeout()
+    {
+        getConnection().onWriteTimeout();
+    }
+
+    private class ReadTimeoutAction implements Runnable
+    {
+        public void run()
+        {
+            // Delegating to thread pool guarantees that the scheduler is not delayed by slow user code
+            getThreadPool().execute(readTimeoutCommand);
+        }
+    }
+
     private class ReadTimeoutCommand implements Runnable
     {
         public void run()
         {
-            getConnection().onReadTimeout();
+            onReadTimeout();
         }
     }
+
     private class WriteTimeoutCommand implements Runnable
     {
         public void run()
         {
-            getConnection().onWriteTimeout();
+            onWriteTimeout();
         }
+    }
+
+    private enum ReadState
+    {
+        WAIT, READ, TIMEOUT
     }
 }

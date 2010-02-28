@@ -147,6 +147,7 @@ public class StandardServerConnector
         // TODO: use a thread factory ?
         threadPool.execute(new Acceptor());
 
+        logger.info("ServerConnector {} listening on {}", this, serverChannel.socket().getLocalSocketAddress());
         return serverChannel.socket().getLocalPort();
     }
 
@@ -178,7 +179,7 @@ public class StandardServerConnector
 
         Selector selector = chooseSelector(selectors);
 
-        Coordinator coordinator = newCoordinator(selector, threadPool);
+        Coordinator coordinator = newCoordinator(selector, threadPool, scheduler);
 
         Channel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
         coordinator.setAsyncChannel(asyncChannel);
@@ -196,7 +197,7 @@ public class StandardServerConnector
         return selectors[index];
     }
 
-    protected Coordinator newCoordinator(Selector selector, Executor threadPool)
+    protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
     {
         return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }

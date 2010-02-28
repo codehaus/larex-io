@@ -16,10 +16,8 @@
 
 package org.codehaus.larex.io;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,9 +34,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
 /**
- * @version $Revision: 903 $ $Date$
+ * @version $Revision$ $Date$
  */
-public class StandardClientConnectorTest
+public class ClientReadTimeoutTest
 {
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
@@ -58,27 +56,16 @@ public class StandardClientConnectorTest
     }
 
     @Test
-    public void testConnect() throws Exception
+    public void testReadTimeout() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-
-        final CountDownLatch acceptLatch = new CountDownLatch(1);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler)
-        {
-            @Override
-            protected void accepted(SocketChannel channel) throws IOException
-            {
-                super.accepted(channel);
-                acceptLatch.countDown();
-            }
-        };
+        StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler);
         int port = serverConnector.listen();
-
         try
         {
-            final CountDownLatch responseLatch = new CountDownLatch(1);
-            StandardClientConnector clientConnector = new StandardClientConnector(threadPool, scheduler);
-            Endpoint<StandardConnection> endpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            final CountDownLatch timeoutLatch = new CountDownLatch(1);
+            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)
                 {
@@ -87,18 +74,22 @@ public class StandardClientConnectorTest
                         @Override
                         protected void read(ByteBuffer buffer)
                         {
-                            responseLatch.countDown();
+                        }
+
+                        @Override
+                        public void onReadTimeout()
+                        {
+                            timeoutLatch.countDown();
                         }
                     };
                 }
             });
-
+            int readTimeout = 1000;
+            endpoint.setReadTimeout(readTimeout);
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
             try
             {
-                assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));
-                connection.write(ByteBuffer.wrap(new byte[]{1}));
-                assertTrue(responseLatch.await(1000, TimeUnit.MILLISECONDS));
+                assertTrue(timeoutLatch.await(readTimeout * 2, TimeUnit.MILLISECONDS));
             }
             finally
             {
@@ -108,7 +99,7 @@ public class StandardClientConnectorTest
         finally
         {
             serverConnector.close();
-            serverConnector.join(1000L);
+            serverConnector.join(1000);
         }
     }
 }
