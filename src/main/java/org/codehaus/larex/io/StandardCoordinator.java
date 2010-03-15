@@ -31,8 +31,9 @@ public class StandardCoordinator implements Coordinator
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private final Selector selector;
     private final Executor threadPool;
+    private final Runnable readyCommand = new ReadyCommand();
     private final Runnable readCommand = new ReadCommand();
-    private final Runnable closingCommand = new ClosingCommand();
+    private final Runnable closeCommand = new CloseCommand();
     private volatile Channel channel;
     private volatile Connection connection;
     private volatile int readBufferSize = 1024;
@@ -86,6 +87,7 @@ public class StandardCoordinator implements Coordinator
     public void onOpen()
     {
         connection.onOpen();
+        threadPool.execute(readyCommand);
     }
 
     public void onReadReady()
@@ -128,12 +130,7 @@ public class StandardCoordinator implements Coordinator
 
     public void onClose()
     {
-        threadPool.execute(closingCommand);
-    }
-
-    protected void onClosing()
-    {
-        connection.onClosing();
+        threadPool.execute(closeCommand);
     }
 
     public void onRemoteClose()
@@ -159,7 +156,18 @@ public class StandardCoordinator implements Coordinator
 
     public void close()
     {
-        channel.close();
+        try
+        {
+            connection.onClose();
+        }
+        catch (Exception x)
+        {
+            logger.info("Unexpected exception", x);
+        }
+        finally
+        {
+            channel.close();
+        }
     }
 
     public void onClosed()
@@ -167,9 +175,22 @@ public class StandardCoordinator implements Coordinator
         connection.onClosed();
     }
 
+    protected void ready()
+    {
+        connection.onReady();
+    }
+
     protected void read()
     {
         channel.read(readBufferSize);
+    }
+
+    private class ReadyCommand implements Runnable
+    {
+        public void run()
+        {
+            ready();
+        }
     }
 
     private class ReadCommand implements Runnable
@@ -191,21 +212,17 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    private class ClosingCommand implements Runnable
+    private class CloseCommand implements Runnable
     {
         public void run()
         {
             try
             {
-                onClosing();
+                close();
             }
             catch (Exception x)
             {
                 logger.info("Unexpected exception", x);
-            }
-            finally
-            {
-                close();
             }
         }
     }

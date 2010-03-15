@@ -17,7 +17,6 @@
 package org.codehaus.larex.io;
 
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,13 +60,8 @@ public class ClientClosesServerIsNotifiedTest
         {
             public Connection newConnection(Coordinator coordinator)
             {
-                return new StandardConnection(coordinator)
+                return new IdleConnection(coordinator)
                 {
-                    @Override
-                    protected void read(ByteBuffer buffer)
-                    {
-                    }
-
                     @Override
                     public void onRemoteClose()
                     {
@@ -86,18 +80,12 @@ public class ClientClosesServerIsNotifiedTest
             {
                 public StandardConnection newConnection(Coordinator coordinator)
                 {
-                    return new StandardConnection(coordinator)
+                    return new IdleConnection(coordinator)
                     {
                         @Override
-                        public void onOpen()
+                        public void onReady()
                         {
-                            super.onOpen();
                             openLatch.countDown();
-                        }
-
-                        @Override
-                        protected void read(ByteBuffer buffer)
-                        {
                         }
                     };
                 }

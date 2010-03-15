@@ -18,11 +18,6 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * <p>Partial implementation of {@link Connection}, that provides:</p>
@@ -33,22 +28,14 @@ import org.slf4j.LoggerFactory;
  *
  * @version $Revision$ $Date$
  */
-public abstract class AbstractConnection implements Connection
+public abstract class WritableConnection extends ClosableConnection
 {
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
-    protected final boolean debug = logger.isDebugEnabled();
-    private final Coordinator coordinator;
-    private State state = State.WRITE;
-    private volatile CountDownLatch softClose;
+    private final Object writeLock = new Object();
+    private WriteState writeState = WriteState.WRITE;
 
-    public AbstractConnection(Coordinator coordinator)
+    protected WritableConnection(Coordinator coordinator)
     {
-        this.coordinator = coordinator;
-    }
-
-    protected Coordinator getCoordinator()
-    {
-        return coordinator;
+        super(coordinator);
     }
 
     public ByteBuffer copy(ByteBuffer source)
@@ -61,10 +48,10 @@ public abstract class AbstractConnection implements Connection
 
     public final void onWrite()
     {
-        synchronized (this)
+        synchronized (writeLock)
         {
-            state = State.WRITE;
-            notify();
+            writeState = WriteState.WRITE;
+            writeLock.notify();
         }
         onWriteHook();
     }
@@ -75,10 +62,10 @@ public abstract class AbstractConnection implements Connection
 
     public final void onWriteTimeout()
     {
-        synchronized (this)
+        synchronized (writeLock)
         {
-            state = State.TIMEOUT;
-            notify();
+            writeState = WriteState.TIMEOUT;
+            writeLock.notify();
         }
         onWriteTimeoutHook();
     }
@@ -96,35 +83,35 @@ public abstract class AbstractConnection implements Connection
      * @throws RuntimeSocketTimeoutException if the write timeout expires
      * @throws RuntimeSocketClosedException  if the connection is closed
      */
-    public void write(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
+    public final void write(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
     {
         while (buffer.hasRemaining())
         {
-            int written = coordinator.write(buffer);
+            int written = getCoordinator().write(buffer);
             if (debug)
                 logger.debug("{} wrote {} bytes", this, written);
 
             if (buffer.hasRemaining())
             {
                 // We could not write everything, suspend the writer thread until we are write ready
-                synchronized (this)
+                synchronized (writeLock)
                 {
-                    if (state == State.CLOSE)
+                    if (writeState == WriteState.CLOSE)
                         throw new RuntimeSocketClosedException();
 
-                    state = State.WAIT;
+                    writeState = WriteState.WAIT;
                     // We must issue the needsWrite() below within the sync block, otherwise
                     // another thread can issue a notify that no one is ready to listen and
                     // this thread will wait forever for a notify that already happened.
-                    coordinator.needsWrite(true);
+                    getCoordinator().needsWrite(true);
 
-                    while (state == State.WAIT)
+                    while (writeState == WriteState.WAIT)
                     {
                         try
                         {
                             if (debug)
                                 logger.debug("Writer thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
-                            wait();
+                            writeLock.wait();
                             if (debug)
                                 logger.debug("Writer thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                         }
@@ -137,72 +124,27 @@ public abstract class AbstractConnection implements Connection
                         }
                     }
 
-                    if (state == State.TIMEOUT)
+                    if (writeState == WriteState.TIMEOUT)
                         throw new RuntimeSocketTimeoutException();
-                    else if (state == State.CLOSE)
+                    else if (writeState == WriteState.CLOSE)
                         throw new RuntimeSocketClosedException();
                 }
             }
         }
     }
 
-    public void onRemoteClose()
+    @Override
+    void doClose()
     {
-    }
-
-    public void onClosing()
-    {
-    }
-
-    public final void onClosed()
-    {
-        CountDownLatch softClose = this.softClose;
-        if (softClose != null)
-            softClose.countDown();
-        onClosedHook();
-    }
-
-    protected void onClosedHook()
-    {
-    }
-
-    /**
-     * <p>Closes this connection.</p>
-     * <p>If a call to {@link #write(ByteBuffer)} is currently blocked, it will be woken up.</p>
-     * @param type how to close this connection
-     */
-    public void close(CloseType type)
-    {
-        synchronized (this)
+        synchronized (writeLock)
         {
-            state = State.CLOSE;
-            notify();
+            writeState = WriteState.CLOSE;
+            writeLock.notify();
         }
-        coordinator.close(type);
+        super.doClose();
     }
 
-    public void close()
-    {
-        synchronized (this)
-        {
-            state = State.CLOSE;
-            notify();
-        }
-        coordinator.close();
-    }
-
-    public boolean softClose(long timeout) throws InterruptedException
-    {
-        softClose = new CountDownLatch(1);
-        close(CloseType.OUTPUT);
-        boolean result = softClose.await(timeout, TimeUnit.MILLISECONDS);
-        softClose = null;
-        if (!result)
-            close();
-        return result;
-    }
-
-    private enum State
+    private enum WriteState
     {
         WRITE, WAIT, TIMEOUT, CLOSE
     }

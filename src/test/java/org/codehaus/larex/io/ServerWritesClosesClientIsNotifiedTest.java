@@ -68,9 +68,8 @@ public class ServerWritesClosesClientIsNotifiedTest
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    public void onOpen()
+                    public void onReady()
                     {
-                        super.onOpen();
                         write(ByteBuffer.wrap(new byte[]{1}));
                         close();
                     }

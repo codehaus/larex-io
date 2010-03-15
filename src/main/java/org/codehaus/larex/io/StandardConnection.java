@@ -21,7 +21,7 @@ import java.nio.ByteBuffer;
 /**
  * @version $Revision$ $Date$
  */
-public abstract class StandardConnection extends AbstractConnection
+public abstract class StandardConnection extends WritableConnection
 {
     public StandardConnection(Coordinator coordinator)
     {
@@ -31,10 +31,9 @@ public abstract class StandardConnection extends AbstractConnection
     public final void onOpen()
     {
         getCoordinator().needsRead(true);
-        onOpenHook();
     }
 
-    protected void onOpenHook()
+    public void onReady()
     {
     }
 

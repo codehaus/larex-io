@@ -18,28 +18,22 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
-import java.util.concurrent.Executor;
 
 /**
  * @version $Revision$ $Date$
  */
-public abstract class BlockingConnection extends AbstractConnection implements Runnable
+public abstract class BlockingConnection extends WritableConnection
 {
-    private final Executor threadPool;
     private ByteBuffer buffer;
-    private State state = State.WAIT;
+    private ReadState readState = ReadState.WAIT;
 
-    public BlockingConnection(Coordinator coordinator, Executor threadPool)
+    public BlockingConnection(Coordinator coordinator)
     {
         super(coordinator);
-        this.threadPool = threadPool;
     }
 
-    public abstract void run();
-
-    public void onOpen()
+    public final void onOpen()
     {
-        threadPool.execute(this);
     }
 
     public void onRead(ByteBuffer buffer)
@@ -47,7 +41,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
         synchronized (this)
         {
             this.buffer.put(buffer);
-            state = State.READ;
+            readState = ReadState.READ;
             notify();
         }
     }
@@ -56,7 +50,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
     {
         synchronized (this)
         {
-            state = State.TIMEOUT;
+            readState = ReadState.TIMEOUT;
             notify();
         }
     }
@@ -68,13 +62,13 @@ public abstract class BlockingConnection extends AbstractConnection implements R
 
         synchronized (this)
         {
-            if (state == State.REMOTE_CLOSE)
+            if (readState == ReadState.REMOTE_CLOSE)
                 return -1;
 
             this.buffer = buffer;
-            state = State.WAIT;
+            readState = ReadState.WAIT;
             getCoordinator().needsRead(true);
-            while (state == State.WAIT)
+            while (readState == ReadState.WAIT)
             {
                 try
                 {
@@ -90,11 +84,11 @@ public abstract class BlockingConnection extends AbstractConnection implements R
 
             if (buffer.position() == start)
             {
-                if (state == State.TIMEOUT)
+                if (readState == ReadState.TIMEOUT)
                     throw new RuntimeSocketTimeoutException();
-                else if (state == State.CLOSE)
+                else if (readState == ReadState.CLOSE)
                     throw new RuntimeSocketClosedException();
-                else if (state == State.REMOTE_CLOSE)
+                else if (readState == ReadState.REMOTE_CLOSE)
                     return -1;
             }
         }
@@ -106,7 +100,7 @@ public abstract class BlockingConnection extends AbstractConnection implements R
     {
         synchronized (this)
         {
-            state = State.REMOTE_CLOSE;
+            readState = ReadState.REMOTE_CLOSE;
             notify();
         }
         onRemoteCloseHook();
@@ -117,17 +111,17 @@ public abstract class BlockingConnection extends AbstractConnection implements R
     }
 
     @Override
-    public void close(CloseType type)
+    void doClose()
     {
         synchronized (this)
         {
-            state = State.CLOSE;
+            readState = ReadState.CLOSE;
             notify();
         }
-        super.close(type);
+        super.doClose();
     }
 
-    private enum State
+    private enum ReadState
     {
         READ, WAIT, TIMEOUT, REMOTE_CLOSE, CLOSE
     }

@@ -98,9 +98,8 @@ public class ClientClosesTest
                     return new StandardConnection(coordinator)
                     {
                         @Override
-                        public void onOpen()
+                        public void onReady()
                         {
-                            super.onOpen();
                             openLatch.countDown();
                         }
 
