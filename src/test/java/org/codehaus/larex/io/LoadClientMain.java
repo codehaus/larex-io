@@ -28,8 +28,6 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -62,7 +60,7 @@ public class LoadClientMain
         int maxThreads = 500;
         ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        Scheduler scheduler = new StandardScheduler();
 
         StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
 

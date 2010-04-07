@@ -22,17 +22,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.connector.Endpoint;
 import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -41,25 +36,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class ServerReadsZeroTest
+public class ServerReadsZeroTest extends AbstractTestCase
 {
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testReadZero() throws Exception
     {
@@ -82,7 +60,7 @@ public class ServerReadsZeroTest
         final AtomicInteger reads = new AtomicInteger();
         final AtomicInteger needReads = new AtomicInteger();
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler)
+        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, getThreadPool(), getScheduler())
         {
             @Override
             protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
@@ -108,7 +86,7 @@ public class ServerReadsZeroTest
             }
 
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+            protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
             {
                 return new StandardCoordinator(selector, threadPool)
                 {
@@ -132,7 +110,7 @@ public class ServerReadsZeroTest
 
         try
         {
-            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
             Endpoint<IdleConnection> endpoint = connector.newEndpoint(new IdleConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
             try

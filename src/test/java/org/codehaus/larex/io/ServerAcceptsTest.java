@@ -21,14 +21,9 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -36,32 +31,15 @@ import static org.junit.Assert.assertTrue;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class ServerAcceptsTest
+public class ServerAcceptsTest extends AbstractTestCase
 {
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testAcceptIsBlocking() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch latch = new CountDownLatch(1);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, null, threadPool, scheduler)
+        StandardServerConnector serverConnector = new StandardServerConnector(address, null, getThreadPool(), getScheduler())
         {
             @Override
             protected void accepted(SocketChannel channel) throws IOException

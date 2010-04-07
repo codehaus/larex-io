@@ -105,6 +105,7 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
+        // TODO: consider using a pooled thread, not the selector thread
         connection.onWrite();
     }
 

@@ -18,40 +18,18 @@ package org.codehaus.larex.io;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.codehaus.larex.io.connector.Endpoint;
 import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
  * @version $Revision$ $Date$
  */
-public class ClientClosesServerIsNotifiedTest
+public class ClientClosesServerIsNotifiedTest extends AbstractTestCase
 {
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testClientClosesServerIsNotified() throws Exception
     {
@@ -69,13 +47,13 @@ public class ClientClosesServerIsNotifiedTest
                     }
                 };
             }
-        }, threadPool, scheduler);
+        }, getThreadPool(), getScheduler());
         int port = serverConnector.listen();
 
         try
         {
             final CountDownLatch openLatch = new CountDownLatch(1);
-            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)

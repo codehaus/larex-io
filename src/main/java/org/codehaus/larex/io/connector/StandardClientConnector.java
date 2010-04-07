@@ -17,13 +17,13 @@
 package org.codehaus.larex.io.connector;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.ReadWriteSelector;
+import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.ThreadLocalByteBuffers;
 
@@ -33,17 +33,17 @@ import org.codehaus.larex.io.ThreadLocalByteBuffers;
 public class StandardClientConnector
 {
     private final Executor threadPool;
-    private final ScheduledExecutorService scheduler;
+    private final Scheduler scheduler;
     private final ByteBuffers byteBuffers;
     private final Selector[] selectors;
     private final AtomicInteger selector = new AtomicInteger();
 
-    public StandardClientConnector(Executor threadPool, ScheduledExecutorService scheduler)
+    public StandardClientConnector(Executor threadPool, Scheduler scheduler)
     {
         this(threadPool, scheduler, 1);
     }
 
-    public StandardClientConnector(Executor threadPool, ScheduledExecutorService scheduler, int selectors)
+    public StandardClientConnector(Executor threadPool, Scheduler scheduler, int selectors)
     {
         this.threadPool = threadPool;
         this.scheduler = scheduler;
@@ -78,7 +78,7 @@ public class StandardClientConnector
         return selectors[index];
     }
 
-    protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+    protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
         return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler);
     }

@@ -21,16 +21,11 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.codehaus.larex.io.connector.Endpoint;
 import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -38,32 +33,15 @@ import static org.junit.Assert.assertTrue;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class StandardClientConnectorTest
+public class StandardClientConnectorTest extends AbstractTestCase
 {
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testConnect() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch acceptLatch = new CountDownLatch(1);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler)
+        StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
             protected void accepted(SocketChannel channel) throws IOException
@@ -77,7 +55,7 @@ public class StandardClientConnectorTest
         try
         {
             final CountDownLatch responseLatch = new CountDownLatch(1);
-            StandardClientConnector clientConnector = new StandardClientConnector(threadPool, scheduler);
+            StandardClientConnector clientConnector = new StandardClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)

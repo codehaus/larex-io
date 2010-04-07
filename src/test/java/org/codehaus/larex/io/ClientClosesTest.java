@@ -20,9 +20,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -30,11 +27,7 @@ import org.codehaus.larex.io.connector.Endpoint;
 import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardEndpoint;
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -42,26 +35,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * @version $Revision$ $Date$
  */
-public class ClientClosesTest
+public class ClientClosesTest extends AbstractTestCase
 {
-    private final Logger logger = LoggerFactory.getLogger(getClass());
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testClientClosesServerIsNotified() throws Exception
     {
@@ -84,13 +59,13 @@ public class ClientClosesTest
                     }
                 };
             }
-        }, threadPool, scheduler);
+        }, getThreadPool(), getScheduler());
         int port = serverConnector.listen();
 
         try
         {
             final CountDownLatch openLatch = new CountDownLatch(1);
-            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)
@@ -151,10 +126,10 @@ public class ClientClosesTest
                     }
                 };
             }
-        }, threadPool, scheduler)
+        }, getThreadPool(), getScheduler())
         {
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+            protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
             {
                 return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                 {
@@ -185,15 +160,15 @@ public class ClientClosesTest
             final CountDownLatch latch2 = new CountDownLatch(1);
             final CountDownLatch latch3 = new CountDownLatch(1);
             final AtomicBoolean read = new AtomicBoolean(false);
-            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler)
+            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
-                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
                 {
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
                         {
                             return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                             {
@@ -293,7 +268,7 @@ public class ClientClosesTest
                     }
                 };
             }
-        }, threadPool, scheduler);
+        }, getThreadPool(), getScheduler());
         int port = serverConnector.listen();
         try
         {
@@ -301,15 +276,15 @@ public class ClientClosesTest
             final CountDownLatch latch2 = new CountDownLatch(1);
             final CountDownLatch latch3 = new CountDownLatch(1);
             final CountDownLatch latch5 = new CountDownLatch(1);
-            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler)
+            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
-                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
                 {
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
                         {
                             return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                             {

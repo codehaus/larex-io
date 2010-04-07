@@ -23,7 +23,6 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.ByteBuffers;
@@ -33,6 +32,7 @@ import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.ReadWriteSelector;
 import org.codehaus.larex.io.RuntimeIOException;
+import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.StandardChannel;
 import org.codehaus.larex.io.ThreadLocalByteBuffers;
@@ -49,7 +49,7 @@ public class StandardServerConnector
     private final InetSocketAddress address;
     private final ConnectionFactory connectionFactory;
     private final Executor threadPool;
-    private final ScheduledExecutorService scheduler;
+    private final Scheduler scheduler;
     private final ByteBuffers byteBuffers;
     private final Selector[] selectors;
     private final AtomicInteger selector = new AtomicInteger();
@@ -60,12 +60,12 @@ public class StandardServerConnector
     private volatile Thread acceptorThread;
     private volatile ServerSocketChannel serverChannel;
 
-    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, ScheduledExecutorService scheduler)
+    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
     {
         this(address, connectionFactory, threadPool, scheduler, 1);
     }
 
-    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, ScheduledExecutorService scheduler, int selectors)
+    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler, int selectors)
     {
         this.address = address;
         this.connectionFactory = connectionFactory;
@@ -197,7 +197,7 @@ public class StandardServerConnector
         return selectors[index];
     }
 
-    protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+    protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
     {
         return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }

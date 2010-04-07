@@ -17,8 +17,6 @@
 package org.codehaus.larex.io;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -27,39 +25,62 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class TimeoutCoordinator extends StandardCoordinator
 {
-    private final ScheduledExecutorService scheduler;
+    private final Scheduler scheduler;
     private final long readTimeout;
     private final long writeTimeout;
-    private final Runnable readTimeoutAction = new ReadTimeoutAction();
-    private final Runnable readTimeoutCommand = new ReadTimeoutCommand();
+    private final Scheduler.Task readTimeoutTask;
+    private final Scheduler.Task writeTimeoutTask;
     private final AtomicReference<ReadState> readState = new AtomicReference<ReadState>(ReadState.WAIT);
-    private final Runnable writeTimeoutCommand = new WriteTimeoutCommand();
-    private volatile ScheduledFuture<?> readTimeoutTask;
-    private volatile ScheduledFuture<?> writeTimeoutTask;
 
-    public TimeoutCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler, long readTimeout, long writeTimeout)
+    public TimeoutCoordinator(Selector selector, Executor threadPool, Scheduler scheduler, long readTimeout, long writeTimeout)
     {
         super(selector, threadPool);
         this.scheduler = scheduler;
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;
+
+        final Runnable onReadTimeout = new Runnable()
+        {
+            public void run()
+            {
+                onReadTimeout();
+            }
+        };
+        this.readTimeoutTask = scheduler.newTask(new Runnable()
+        {
+            public void run()
+            {
+                getThreadPool().execute(onReadTimeout);
+            }
+        });
+
+        final Runnable onWriteTimeout = new Runnable()
+        {
+            public void run()
+            {
+                onWriteTimeout();
+            }
+        };
+        this.writeTimeoutTask = scheduler.newTask(new Runnable()
+        {
+            public void run()
+            {
+                getThreadPool().execute(onWriteTimeout);
+            }
+        });
     }
 
     @Override
     public void onReadReady()
     {
-        ScheduledFuture<?> task = readTimeoutTask;
-        if (task != null)
-            task.cancel(false);
+        scheduler.cancel(readTimeoutTask);
         super.onReadReady();
     }
 
     @Override
     public void onWriteReady()
     {
-        ScheduledFuture<?> task = writeTimeoutTask;
-        if (task != null)
-            task.cancel(false);
+        scheduler.cancel(writeTimeoutTask);
         super.onWriteReady();
     }
 
@@ -67,7 +88,7 @@ public class TimeoutCoordinator extends StandardCoordinator
     public void needsRead(boolean needsRead)
     {
         if (needsRead && readTimeout > 0)
-            readTimeoutTask = scheduler.schedule(readTimeoutAction, readTimeout, TimeUnit.MILLISECONDS);
+            scheduler.schedule(readTimeoutTask, readTimeout, TimeUnit.MILLISECONDS);
         super.needsRead(needsRead);
     }
 
@@ -75,14 +96,14 @@ public class TimeoutCoordinator extends StandardCoordinator
     public void needsWrite(boolean needsWrite)
     {
         if (needsWrite && writeTimeout > 0)
-            writeTimeoutTask = scheduler.schedule(writeTimeoutCommand, writeTimeout, TimeUnit.MILLISECONDS);
+            scheduler.schedule(writeTimeoutTask, writeTimeout, TimeUnit.MILLISECONDS);
         super.needsWrite(needsWrite);
     }
 
     @Override
     protected void read()
     {
-        // Notify reads in any case
+        // Notify reads in any case, even if we could not change the state
         boolean reading = readState.compareAndSet(ReadState.WAIT, ReadState.READ);
         try
         {
@@ -115,31 +136,6 @@ public class TimeoutCoordinator extends StandardCoordinator
     protected void onWriteTimeout()
     {
         getConnection().onWriteTimeout();
-    }
-
-    private class ReadTimeoutAction implements Runnable
-    {
-        public void run()
-        {
-            // Delegating to thread pool guarantees that the scheduler is not delayed by slow user code
-            getThreadPool().execute(readTimeoutCommand);
-        }
-    }
-
-    private class ReadTimeoutCommand implements Runnable
-    {
-        public void run()
-        {
-            onReadTimeout();
-        }
-    }
-
-    private class WriteTimeoutCommand implements Runnable
-    {
-        public void run()
-        {
-            onWriteTimeout();
-        }
     }
 
     private enum ReadState

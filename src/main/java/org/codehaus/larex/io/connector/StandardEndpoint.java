@@ -24,7 +24,6 @@ import java.net.SocketTimeoutException;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
 
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Channel;
@@ -34,6 +33,7 @@ import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
 import org.codehaus.larex.io.RuntimeSocketTimeoutException;
+import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.StandardChannel;
 import org.codehaus.larex.io.TimeoutCoordinator;
@@ -51,9 +51,9 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
     private final ConnectionFactory<T> connectionFactory;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
-    private final ScheduledExecutorService scheduler;
+    private final Scheduler scheduler;
 
-    public StandardEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+    public StandardEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
         try
         {
@@ -129,7 +129,7 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
         return connection;
     }
 
-    protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+    protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
     {
         return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }

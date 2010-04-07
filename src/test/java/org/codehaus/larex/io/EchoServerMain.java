@@ -19,8 +19,6 @@ package org.codehaus.larex.io;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +37,7 @@ public class EchoServerMain
                 new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
         InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(null), 8850);
 
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        Scheduler scheduler = new StandardScheduler();
 
         StandardServerConnector connector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler);
         connector.listen();

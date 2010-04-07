@@ -19,16 +19,11 @@ package org.codehaus.larex.io;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -37,25 +32,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * @version $Revision$ $Date$
  */
-public class ServerWritesClosesClientIsNotifiedTest
+public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
 {
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testRemoteClose() throws Exception
     {
@@ -82,13 +60,13 @@ public class ServerWritesClosesClientIsNotifiedTest
             }
         };
 
-        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, threadPool, scheduler);
+        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
         int port = serverConnector.listen();
 
         final AtomicInteger tester = new AtomicInteger();
         final AtomicInteger failure = new AtomicInteger();
         final CountDownLatch latch = new CountDownLatch(1);
-        StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+        StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
         StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
         {
             public StandardConnection newConnection(Coordinator coordinator)

@@ -19,17 +19,12 @@ package org.codehaus.larex.io;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.connector.Endpoint;
 import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardEndpoint;
 import org.codehaus.larex.io.connector.StandardServerConnector;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.fail;
@@ -37,42 +32,25 @@ import static org.junit.Assert.fail;
 /**
  * @version $Revision$ $Date$
  */
-public class ClientWriteTimeoutTest
+public class ClientWriteTimeoutTest extends AbstractTestCase
 {
-    private ExecutorService threadPool;
-    private ScheduledExecutorService scheduler;
-
-    @Before
-    public void init()
-    {
-        threadPool = Executors.newCachedThreadPool();
-        scheduler = Executors.newSingleThreadScheduledExecutor();
-    }
-
-    @After
-    public void destroy()
-    {
-        scheduler.shutdown();
-        threadPool.shutdown();
-    }
-
     @Test
     public void testWriteTimeout() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new IdleConnection.Factory(), threadPool, scheduler);
+        StandardServerConnector serverConnector = new StandardServerConnector(address, new IdleConnection.Factory(), getThreadPool(), getScheduler());
         int port = serverConnector.listen();
         try
         {
-            StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler)
+            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
-                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, ScheduledExecutorService scheduler)
+                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
                 {
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, ScheduledExecutorService scheduler)
+                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
                         {
                             return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                             {
