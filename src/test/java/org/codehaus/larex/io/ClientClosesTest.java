@@ -129,9 +129,9 @@ public class ClientClosesTest extends AbstractTestCase
         }, getThreadPool(), getScheduler())
         {
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+            protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
             {
-                return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                 {
                     @Override
                     protected void read()
@@ -168,9 +168,9 @@ public class ClientClosesTest extends AbstractTestCase
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+                        protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
                         {
-                            return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
                                 protected void read()
@@ -284,9 +284,9 @@ public class ClientClosesTest extends AbstractTestCase
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+                        protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
                         {
-                            return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
                                 protected void read()
@@ -339,7 +339,7 @@ public class ClientClosesTest extends AbstractTestCase
                 {
                     logger.debug("Step 1 released");
                     // Notify the server that we're closing
-                    connection.close(CloseType.OUTPUT);
+                    connection.close(ChannelStreamType.OUTPUT);
                     logger.debug("Step 2 releasing");
                     latch2.countDown();
                 }

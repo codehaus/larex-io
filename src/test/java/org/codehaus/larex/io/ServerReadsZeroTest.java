@@ -63,9 +63,9 @@ public class ServerReadsZeroTest extends AbstractTestCase
         StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, getThreadPool(), getScheduler())
         {
             @Override
-            protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+            protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
             {
-                return new StandardChannel(channel, coordinator, byteBuffers)
+                return new StandardChannel(channel, coordinator)
                 {
                     private final AtomicInteger reads = new AtomicInteger();
 
@@ -86,15 +86,15 @@ public class ServerReadsZeroTest extends AbstractTestCase
             }
 
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+            protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
             {
-                return new StandardCoordinator(selector, threadPool)
+                return new StandardCoordinator(selector, byteBuffers, threadPool)
                 {
                     @Override
-                    public void onRead(ByteBuffer bytes)
+                    protected void onRead(ByteBuffer buffer)
                     {
                         reads.incrementAndGet();
-                        super.onRead(bytes);
+                        super.onRead(buffer);
                     }
 
                     @Override
@@ -119,7 +119,6 @@ public class ServerReadsZeroTest extends AbstractTestCase
                 connection.write(buffer);
                 assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 
-                // One read call, since with 0 bytes read we don't call it
                 assertEquals(1, reads.get());
 
                 // Five needsRead calls: at beginning to enable the reads, then to disable

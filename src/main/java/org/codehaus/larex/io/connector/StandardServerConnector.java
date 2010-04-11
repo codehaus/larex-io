@@ -76,7 +76,7 @@ public class StandardServerConnector
             throw new IllegalArgumentException("Invalid selectors count " + selectors + ": must be >= 1");
         this.selectors = new Selector[selectors];
         for (int i = 0; i < selectors; ++i)
-            this.selectors[i] = newAsyncSelector();
+            this.selectors[i] = newSelector();
     }
 
     protected ByteBuffers newByteBuffers()
@@ -84,7 +84,7 @@ public class StandardServerConnector
         return new ThreadLocalByteBuffers();
     }
 
-    protected Selector newAsyncSelector()
+    protected Selector newSelector()
     {
         return new ReadWriteSelector();
     }
@@ -173,21 +173,21 @@ public class StandardServerConnector
         return !acceptorThread.isAlive();
     }
 
-    protected void accepted(SocketChannel channel) throws IOException
+    protected void accepted(SocketChannel socketChannel) throws IOException
     {
-        channel.configureBlocking(false);
+        socketChannel.configureBlocking(false);
 
         Selector selector = chooseSelector(selectors);
 
-        Coordinator coordinator = newCoordinator(selector, threadPool, scheduler);
+        Coordinator coordinator = newCoordinator(selector, byteBuffers, threadPool, scheduler);
 
-        Channel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
-        coordinator.setAsyncChannel(asyncChannel);
+        Channel channel = newChannel(socketChannel, coordinator);
+        coordinator.setChannel(channel);
 
         Connection connection = connectionFactory.newConnection(coordinator);
         coordinator.setConnection(connection);
 
-        register(selector, asyncChannel, coordinator);
+        register(selector, channel, coordinator);
     }
 
     protected Selector chooseSelector(Selector[] selectors)
@@ -197,14 +197,14 @@ public class StandardServerConnector
         return selectors[index];
     }
 
-    protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+    protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
-        return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }
 
-    protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+    protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
     {
-        return new StandardChannel(channel, coordinator, byteBuffers);
+        return new StandardChannel(channel, coordinator);
     }
 
     protected void register(Selector selector, Channel channel, Coordinator coordinator)
@@ -219,7 +219,7 @@ public class StandardServerConnector
             try
             {
                 acceptorThread = Thread.currentThread();
-                logger.info("ServerConnector {}, acceptor loop entered", this);
+                logger.debug("ServerConnector {}, acceptor loop entered", this);
 
                 while (serverChannel.isOpen())
                 {
@@ -255,7 +255,7 @@ public class StandardServerConnector
             }
             finally
             {
-                logger.info("ServerConnector {}, acceptor loop exited", this);
+                logger.debug("ServerConnector {}, acceptor loop exited", this);
             }
         }
     }

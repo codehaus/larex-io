@@ -20,11 +20,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 
 /**
- * <p>Partial implementation of {@link Connection}, that provides:</p>
- * <ul>
- * <li>a blocking write facility via the {@link #write(ByteBuffer)} method</li>
- * <li>a close facility via the {@link #close()} method</li>
- * </ul>
+ * <p>Partial implementation of {@link Connection}, that provides write functionalities
+ * and inherits close functionalities.</p>
+ * <p>Writes can be non-blocking (via {@link #flush(ByteBuffer)}), or blocking (via
+ * {@link #write(ByteBuffer)}.</p>
  *
  * @version $Revision$ $Date$
  */
@@ -38,6 +37,12 @@ public abstract class WritableConnection extends ClosableConnection
         super(coordinator);
     }
 
+    /**
+     * <p>Copies the given source buffer into a new buffer.</p>
+     *
+     * @param source the buffer to copy
+     * @return the copied buffer
+     */
     public ByteBuffer copy(ByteBuffer source)
     {
         ByteBuffer result = ByteBuffer.allocate(source.remaining());
@@ -46,6 +51,10 @@ public abstract class WritableConnection extends ClosableConnection
         return result;
     }
 
+    /**
+     * <p>Overridden to implement the blocking write functionality.</p>
+     * <p>Override {@link #onWriteHook()} instead.</p>
+     */
     public final void onWrite()
     {
         synchronized (writeLock)
@@ -56,10 +65,17 @@ public abstract class WritableConnection extends ClosableConnection
         onWriteHook();
     }
 
+    /**
+     * <p>Callback invoked by {@link #onWrite()}.</p>
+     */
     protected void onWriteHook()
     {
     }
 
+    /**
+     * <p>Overridden to implement the blocking write functionality.</p>
+     * <p>Override {@link #onWriteTimeoutHook()} instead.</p>
+     */
     public final void onWriteTimeout()
     {
         synchronized (writeLock)
@@ -70,12 +86,15 @@ public abstract class WritableConnection extends ClosableConnection
         onWriteTimeoutHook();
     }
 
+    /**
+     * <p>Callback invoked by {@link #onWriteTimeout()}.</p>
+     */
     protected void onWriteTimeoutHook()
     {
     }
 
     /**
-     * <p>Writes the bytes contained in the given buffer.</p>
+     * <p>Blocking-writes the bytes contained in the given buffer.</p>
      * <p>This call is blocking and will only return when all the bytes have been written,
      * the write timeout expires, or the connection is closed.</p>
      *
@@ -87,7 +106,7 @@ public abstract class WritableConnection extends ClosableConnection
     {
         while (buffer.hasRemaining())
         {
-            int written = getCoordinator().write(buffer);
+            int written = flush(buffer);
             if (debug)
                 logger.debug("{} wrote {} bytes", this, written);
 
@@ -131,6 +150,16 @@ public abstract class WritableConnection extends ClosableConnection
                 }
             }
         }
+    }
+
+    /**
+     * <p>Non-blocking write the bytes contained in the given buffer.</p>
+     * @param buffer the buffer to flush
+     * @return the bytes written
+     */
+    public int flush(ByteBuffer buffer)
+    {
+        return getCoordinator().write(buffer);
     }
 
     @Override

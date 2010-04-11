@@ -20,6 +20,22 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 
 /**
+ * <p>Implementation of {@link Connection} that provides blocking read functionality
+ * and inherits write and close functionalities.</p>
+ * <p>User code must implement {@link #onReady()}, typically in the following way:</p>
+ * <pre>
+ * public void onReady()
+ * {
+ *     ByteBuffer readBuffer = ByteBuffer.allocate(256);
+ *     int read = read(readBuffer);
+ *     // Do something with bytes just read
+ *
+ *     ByteBuffer writeBuffer = ByteBuffer.allocate(256);
+ *     // Fill the writeBuffer with response data
+ *     write(writeBuffer);
+ * }
+ * </pre>
+ *
  * @version $Revision$ $Date$
  */
 public abstract class BlockingConnection extends WritableConnection
@@ -32,11 +48,21 @@ public abstract class BlockingConnection extends WritableConnection
         super(coordinator);
     }
 
+    public abstract void onReady();
+
+    /**
+     * <p>Overridden to implement the blocking read functionality.</p>
+     */
     public final void onOpen()
     {
     }
 
-    public void onRead(ByteBuffer buffer)
+    /**
+     * <p>Overridden to implement the blocking read functionality.</p>
+     *
+     * @param buffer the buffer containing the bytes read
+     */
+    public final void onRead(ByteBuffer buffer)
     {
         synchronized (this)
         {
@@ -46,7 +72,10 @@ public abstract class BlockingConnection extends WritableConnection
         }
     }
 
-    public void onReadTimeout()
+    /**
+     * <p>Overridden to implement the blocking read functionality.</p>
+     */
+    public final void onReadTimeout()
     {
         synchronized (this)
         {
@@ -55,7 +84,15 @@ public abstract class BlockingConnection extends WritableConnection
         }
     }
 
-    protected int read(ByteBuffer buffer)
+    /**
+     * <p>Blocking reads bytes into the given buffer.</p>
+     *
+     * @param buffer the buffer to read bytes into
+     * @return -1 if the remote end has been closed, or the number of bytes that has been read
+     * @throws RuntimeSocketClosedException if this connection has been closed
+     * @throws RuntimeSocketTimeoutException if the read timed out
+     */
+    protected int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
     {
         int start = buffer.position();
         getCoordinator().setReadBufferSize(buffer.remaining());
@@ -96,6 +133,9 @@ public abstract class BlockingConnection extends WritableConnection
         return buffer.position() - start;
     }
 
+    /**
+     * <p>Overridden to implement the blocking read functionality.</p>
+     */
     public final void onRemoteClose()
     {
         synchronized (this)
@@ -103,11 +143,6 @@ public abstract class BlockingConnection extends WritableConnection
             readState = ReadState.REMOTE_CLOSE;
             notify();
         }
-        onRemoteCloseHook();
-    }
-
-    protected void onRemoteCloseHook()
-    {
     }
 
     @Override

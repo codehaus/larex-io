@@ -21,6 +21,9 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
+ * <p>A {@link RejectedExecutionHandler} policy that blocks the caller until the task
+ * can be re-submitted to the thread pool.</p>
+ *
  * @version $Revision$ $Date$
  */
 public class CallerBlocksPolicy implements RejectedExecutionHandler

@@ -16,6 +16,8 @@
 
 package org.codehaus.larex.io;
 
+import java.net.ConnectException;
+
 /**
  * Wraps {@link ConnectException}s thrown by the I/O Java libraries.
  *

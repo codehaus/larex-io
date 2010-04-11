@@ -17,9 +17,15 @@
 package org.codehaus.larex.io;
 
 /**
+ * The factory for {@link Connection} instances.
+ *
  * @version $Revision: 903 $ $Date$
  */
 public interface ConnectionFactory<T extends Connection>
 {
+    /**
+     * @param coordinator the {@link Coordinator} to associate to the connection being created
+     * @return the new connection
+     */
     T newConnection(Coordinator coordinator);
 }

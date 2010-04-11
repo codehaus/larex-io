@@ -35,16 +35,16 @@ public class StandardChannel implements Channel
     private final boolean debug = logger.isDebugEnabled();
     private final SocketChannel channel;
     private final Coordinator coordinator;
-    private final ByteBuffers byteBuffers;
-    private volatile int readAggressiveness = 2;
-    private volatile int writeAggressiveness = 2;
+    private volatile int readAggressiveness;
+    private volatile int writeAggressiveness;
     private volatile SelectionKey selectionKey;
 
-    public StandardChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+    public StandardChannel(SocketChannel channel, Coordinator coordinator)
     {
         this.channel = channel;
         this.coordinator = coordinator;
-        this.byteBuffers = byteBuffers;
+        setReadAggressiveness(2);
+        setWriteAggressiveness(2);
     }
 
     public int getReadAggressiveness()
@@ -83,6 +83,7 @@ public class StandardChannel implements Channel
     {
         try
         {
+            SelectionKey selectionKey = this.selectionKey;
             int oldOperations = selectionKey.interestOps();
             if (add)
                 selectionKey.interestOps(oldOperations | operations);
@@ -98,67 +99,27 @@ public class StandardChannel implements Channel
         }
     }
 
-    public void read(int readBufferSize) throws RuntimeSocketClosedException
+    public boolean read(ByteBuffer buffer)
     {
         try
         {
-            int read;
-            boolean closed;
-            ByteBuffer buffer = byteBuffers.acquire(readBufferSize, false);
-            try
-            {
-                int start = buffer.position();
-                closed = readAggressively(channel, buffer);
-                read = buffer.position() - start;
-
-                if (read > 0)
-                {
-                    if (debug)
-                        logger.debug("Channel {} read {} bytes into {}", new Object[]{this, read, buffer});
-                    buffer.flip();
-                    coordinator.onRead(buffer);
-                }
-            }
-            finally
-            {
-                byteBuffers.release(buffer);
-            }
-
-            if (closed)
-            {
-                if (!channel.socket().isInputShutdown())
-                {
-                    if (debug)
-                        logger.debug("Channel {} closed remotely", this);
-                    coordinator.onRemoteClose();
-                }
-                else
-                {
-                    // Input was explicitly closed
-                    throw new RuntimeSocketClosedException();
-                }
-            }
-            else if (read == 0)
-            {
-                // We read 0 bytes, we need to re-register for read interest
-                coordinator.needsRead(true);
-            }
+            return readAggressively(channel, buffer);
         }
         catch (ClosedChannelException x)
         {
-            close();
+            coordinator.close();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
-            close();
+            coordinator.close();
             throw new RuntimeIOException(x);
         }
     }
 
     protected boolean readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
     {
-        int readAggressiveness = this.readAggressiveness;
+        int readAggressiveness = getReadAggressiveness();
         for (int aggressiveness = 0; aggressiveness < readAggressiveness; ++aggressiveness)
         {
             int read = channel.read(buffer);
@@ -177,20 +138,20 @@ public class StandardChannel implements Channel
         catch (ClosedChannelException x)
         {
             logger.debug("Channel closed during write of {} bytes", buffer.remaining());
-            close();
+            coordinator.close();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
             logger.debug("Unexpected IOException", x);
-            close();
+            coordinator.close();
             throw new RuntimeIOException(x);
         }
     }
 
     protected int writeAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
     {
-        int writeAggressiveness = this.writeAggressiveness;
+        int writeAggressiveness = getWriteAggressiveness();
         int result = 0;
         for (int aggressiveness = 0; aggressiveness < writeAggressiveness; ++aggressiveness)
         {
@@ -199,9 +160,22 @@ public class StandardChannel implements Channel
         return result;
     }
 
-    public void close(CloseType type)
+    public boolean isClosed(ChannelStreamType type)
     {
-        if (!channel.isOpen())
+        switch (type)
+        {
+            case INPUT:
+                return channel.socket().isInputShutdown();
+            case OUTPUT:
+                return channel.socket().isOutputShutdown();
+            default:
+                throw new IllegalStateException();
+        }
+    }
+
+    public void close(ChannelStreamType type)
+    {
+        if (isClosed() || isClosed(type))
             return;
 
         if (debug)
@@ -227,28 +201,30 @@ public class StandardChannel implements Channel
         }
     }
 
+    public boolean isClosed()
+    {
+        return !channel.isOpen();
+    }
+
     public void close()
     {
-        if (!channel.isOpen())
+        if (isClosed())
             return;
+
+        if (debug)
+            logger.debug("Channel {} closing", this);
 
         try
         {
+            SelectionKey selectionKey = this.selectionKey;
             if (selectionKey != null)
                 selectionKey.cancel();
-
-            if (debug)
-                logger.debug("Channel {} closing", this);
 
             channel.close();
         }
         catch (IOException x)
         {
             throw new RuntimeIOException(x);
-        }
-        finally
-        {
-            coordinator.onClosed();
         }
     }
 

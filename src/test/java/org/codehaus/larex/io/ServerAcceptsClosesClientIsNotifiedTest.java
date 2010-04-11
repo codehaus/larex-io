@@ -43,9 +43,9 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
         StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
-            protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+            protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
             {
-                return new StandardChannel(channel, coordinator, byteBuffers)
+                return new StandardChannel(channel, coordinator)
                 {
                     @Override
                     public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException

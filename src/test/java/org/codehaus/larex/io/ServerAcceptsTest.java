@@ -42,7 +42,7 @@ public class ServerAcceptsTest extends AbstractTestCase
         StandardServerConnector serverConnector = new StandardServerConnector(address, null, getThreadPool(), getScheduler())
         {
             @Override
-            protected void accepted(SocketChannel channel) throws IOException
+            protected void accepted(SocketChannel socketChannel) throws IOException
             {
                 latch.countDown();
             }

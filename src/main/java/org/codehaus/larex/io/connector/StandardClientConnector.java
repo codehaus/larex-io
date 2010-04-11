@@ -52,7 +52,7 @@ public class StandardClientConnector
             throw new IllegalArgumentException("Invalid selectors count " + selectors + ": must be >= 1");
         this.selectors = new Selector[selectors];
         for (int i = 0; i < selectors; ++i)
-            this.selectors[i] = newAsyncSelector();
+            this.selectors[i] = newSelector();
     }
 
     protected ByteBuffers newByteBuffers()
@@ -60,7 +60,7 @@ public class StandardClientConnector
         return new ThreadLocalByteBuffers();
     }
 
-    protected Selector newAsyncSelector()
+    protected Selector newSelector()
     {
         return new ReadWriteSelector();
     }

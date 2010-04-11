@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
  * the {@link Connection} and the {@link Selector}.</p>
  * <p>{@link Coordinator} receives I/O events from the {@link Selector}, and
  * dispatches them appropriately to either the {@link Channel} or the {@link Connection}.</p>
- * <p/>
  *
  * @version $Revision: 903 $ $Date$
  */
@@ -32,7 +31,7 @@ public interface Coordinator extends Selector.Listener
     /**
      * @param channel the channel associated with this coordinator
      */
-    public void setAsyncChannel(Channel channel);
+    public void setChannel(Channel channel);
 
     /**
      * @param connection the connection associated with this coordinator
@@ -62,24 +61,15 @@ public interface Coordinator extends Selector.Listener
      * write more bytes to the I/O system.</p>
      *
      * @param needsWrite true to indicate that there is interest in receiving read events,
-     *                  false to indicate that there is no interest in receiving read events.
+     *                   false to indicate that there is no interest in receiving read events.
      */
     public void needsWrite(boolean needsWrite);
 
     /**
-     * <p>Reads bytes from the given {@code buffer}.</p>
-     * <p>Normally, a channel will call this method after it read bytes from the I/O system,
-     * and this coordinator will forward the method call to the connection.</p>
-     *
-     * @param buffer the buffer to read bytes from
-     * @see Connection#onRead(ByteBuffer)
-     */
-    public void onRead(ByteBuffer buffer);
-
-    /**
-     * <p>Writes bytes from the given {@code buffer}.</p>
+     * <p>Non-blocking writes bytes from the given {@code buffer}.</p>
      * <p>Normally, a connection will call this method after it filled the buffer with bytes
      * to write, and this coordinator will forward the call to the channel.</p>
+     *
      * @param buffer the buffer to write bytes from
      * @return the number of bytes written
      * @throws RuntimeSocketClosedException if the associated channel has been closed
@@ -88,16 +78,17 @@ public interface Coordinator extends Selector.Listener
     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 
     /**
-     * <p>Closes this coordinator and the associated channel.</p>
-     * @see Channel#close(CloseType)
+     * <p>Closes the given stream type of the channel associated with this coordinator.</p>
+     *
+     * @param type the stream type to close
+     * @see Channel#close(ChannelStreamType)
      */
-    public void onClose();
+    public void close(ChannelStreamType type);
 
-    public void onRemoteClose();
-
-    public void close(CloseType type);
-
+    /**
+     * <p>Closes the channel associated with this coordinator.</p>
+     *
+     * @see Channel#close()
+     */
     public void close();
-
-    public void onClosed();
 }

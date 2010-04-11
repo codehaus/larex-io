@@ -49,9 +49,9 @@ public class ServerWritesZeroTest extends AbstractTestCase
         StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
-            protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+            protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
             {
-                return new StandardChannel(channel, coordinator, byteBuffers)
+                return new StandardChannel(channel, coordinator)
                 {
                     private final AtomicInteger writes = new AtomicInteger();
 
@@ -82,9 +82,9 @@ public class ServerWritesZeroTest extends AbstractTestCase
             }
 
             @Override
-            protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+            protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
             {
-                return new StandardCoordinator(selector, threadPool)
+                return new StandardCoordinator(selector, byteBuffers, threadPool)
                 {
                     @Override
                     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException

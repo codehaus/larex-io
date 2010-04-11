@@ -32,9 +32,9 @@ public class TimeoutCoordinator extends StandardCoordinator
     private final Scheduler.Task writeTimeoutTask;
     private final AtomicReference<ReadState> readState = new AtomicReference<ReadState>(ReadState.WAIT);
 
-    public TimeoutCoordinator(Selector selector, Executor threadPool, Scheduler scheduler, long readTimeout, long writeTimeout)
+    public TimeoutCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler, long readTimeout, long writeTimeout)
     {
-        super(selector, threadPool);
+        super(selector, byteBuffers, threadPool);
         this.scheduler = scheduler;
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;

@@ -16,6 +16,8 @@
 
 package org.codehaus.larex.io;
 
+import java.io.IOException;
+
 /**
  * Wraps generic {@link IOException}s thrown by the I/O Java libraries.
  *

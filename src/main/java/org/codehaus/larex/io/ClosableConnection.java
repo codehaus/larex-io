@@ -16,6 +16,8 @@
 
 package org.codehaus.larex.io;
 
+import java.net.Socket;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -23,6 +25,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * <p>Partial implementation of {@link Connection} that provides close functionalities.</p>
+ * <p>Closing a connection can be done in two ways: hard closing the connection, or soft
+ * closing the connection.</p>
+ * <p>When a connection is {@link #close() hard closed}, the socket associated with the connection
+ * is closed (via {@link SocketChannel#close()}).</p>
+ * <p>When a connection is {@link #softClose(long) soft closed}, only its output is shut down (via
+ * {@link Socket#shutdownOutput()}), but not its input; the remote end of the connection
+ * detects this ({@link #onRemoteClose()} is invoked, or equivalently a raw socket would read -1),
+ * and may optionally decide to write the last data before hard closing the connection.<br />
+ * The connection reads the last data sent by the remote end, then detects that the remote end
+ * was closed and can now hard close the connection.<br />
+ * Note however that the remote end cannot know if the connection was soft closed or hard closed,
+ * so it must be prepared to failures when writing the last data.</p>
+ *
  * @version $Revision$ $Date$
  */
 public abstract class ClosableConnection implements Connection
@@ -37,6 +53,9 @@ public abstract class ClosableConnection implements Connection
         this.coordinator = coordinator;
     }
 
+    /**
+     * @return the coordinator associated with this connection
+     */
     protected Coordinator getCoordinator()
     {
         return coordinator;
@@ -50,6 +69,10 @@ public abstract class ClosableConnection implements Connection
     {
     }
 
+    /**
+     * <p>Overridden to implement the soft close functionality.</p>
+     * <p>Override {@link #onClosedHook()} instead.</p>
+     */
     public final void onClosed()
     {
         doOnClosed();
@@ -63,35 +86,55 @@ public abstract class ClosableConnection implements Connection
             softClose.countDown();
     }
 
+    /**
+     * <p>Callback invoked by {@link #onClosed()}.</p>
+     */
     protected void onClosedHook()
     {
     }
 
     /**
-     * <p>Half-closes this connection.</p>
-     * @param type the half to close on this connection
+     * <p>Closes the given stream type of this connection.</p>
+     *
+     * @param type the stream type to close
      */
-    public final void close(CloseType type)
+    public final void close(ChannelStreamType type)
     {
         doClose();
-        coordinator.close(type);
+        getCoordinator().close(type);
     }
 
     void doClose()
     {
     }
 
+    /**
+     * <p>Hard closes this connection.</p>
+     *
+     * @see #softClose(long)
+     */
     public final void close()
     {
         doClose();
-        coordinator.close();
+        getCoordinator().close();
     }
 
+    /**
+     * <p>Soft closes this connection, waiting the specified timeout for the remote end
+     * to collaborate in closing the connection.<br />
+     * If the remote end does not close the connection within the timeout, this connection
+     * is then {@link #close() hard closed}.</p>
+     *
+     * @param timeout the timeout to wait, in milliseconds, for the remote end to close the connection
+     * @return true if the connection was soft closed, false if it was hard closed
+     * @throws InterruptedException if interrupted while waiting
+     * @see #close()
+     */
     public final boolean softClose(long timeout) throws InterruptedException
     {
         CountDownLatch softClose = new CountDownLatch(1);
         this.softClose = softClose;
-        close(CloseType.OUTPUT);
+        close(ChannelStreamType.OUTPUT);
         boolean result = softClose.await(timeout, TimeUnit.MILLISECONDS);
         this.softClose = null;
         if (!result)

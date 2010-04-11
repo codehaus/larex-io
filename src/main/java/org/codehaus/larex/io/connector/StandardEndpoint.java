@@ -112,31 +112,31 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
         }
     }
 
-    protected T connected(SocketChannel channel) throws IOException
+    protected T connected(SocketChannel socketChannel) throws IOException
     {
-        channel.configureBlocking(false);
+        socketChannel.configureBlocking(false);
 
-        Coordinator coordinator = newCoordinator(selector, threadPool, scheduler);
+        Coordinator coordinator = newCoordinator(selector, byteBuffers, threadPool, scheduler);
 
-        Channel asyncChannel = newAsyncChannel(channel, coordinator, byteBuffers);
-        coordinator.setAsyncChannel(asyncChannel);
+        Channel channel = newChannel(socketChannel, coordinator);
+        coordinator.setChannel(channel);
 
         T connection = connectionFactory.newConnection(coordinator);
         coordinator.setConnection(connection);
 
-        register(selector, asyncChannel, coordinator);
+        register(selector, channel, coordinator);
 
         return connection;
     }
 
-    protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+    protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
-        return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
     }
 
-    protected Channel newAsyncChannel(SocketChannel channel, Coordinator coordinator, ByteBuffers byteBuffers)
+    protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
     {
-        return new StandardChannel(channel, coordinator, byteBuffers);
+        return new StandardChannel(channel, coordinator);
     }
 
     protected void register(Selector selector, Channel channel, Coordinator coordinator)

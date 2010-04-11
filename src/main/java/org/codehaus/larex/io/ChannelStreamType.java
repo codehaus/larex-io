@@ -17,9 +17,19 @@
 package org.codehaus.larex.io;
 
 /**
+ * <p>Enumerates the streams of a channel.</p>
+ *
  * @version $Revision$ $Date$
  */
-public enum CloseType
+public enum ChannelStreamType
 {
-    INPUT, OUTPUT
+    /**
+     * <p>The input stream of a channel.</p>
+     */
+    INPUT,
+
+    /**
+     * <p>The output stream of a channel.</p>
+     */
+    OUTPUT
 }

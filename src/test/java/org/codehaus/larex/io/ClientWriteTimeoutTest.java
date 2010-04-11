@@ -50,9 +50,9 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, Executor threadPool, Scheduler scheduler)
+                        protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
                         {
-                            return new TimeoutCoordinator(selector, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
                             {
                                 public AtomicInteger writes = new AtomicInteger(0);
 

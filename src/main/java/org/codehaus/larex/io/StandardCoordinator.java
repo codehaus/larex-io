@@ -30,23 +30,31 @@ public class StandardCoordinator implements Coordinator
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private final Selector selector;
+    private final ByteBuffers byteBuffers;
     private final Executor threadPool;
-    private final Runnable readyCommand = new ReadyCommand();
+    private final Runnable onReadyCommand = new OnReadyCommand();
     private final Runnable readCommand = new ReadCommand();
+    private final Runnable onWriteCommand = new OnWriteCommand();
     private final Runnable closeCommand = new CloseCommand();
     private volatile Channel channel;
     private volatile Connection connection;
     private volatile int readBufferSize = 1024;
 
-    public StandardCoordinator(Selector selector, Executor threadPool)
+    public StandardCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool)
     {
         this.selector = selector;
+        this.byteBuffers = byteBuffers;
         this.threadPool = threadPool;
     }
 
     protected Selector getSelector()
     {
         return selector;
+    }
+
+    protected ByteBuffers getByteBuffers()
+    {
+        return byteBuffers;
     }
 
     protected Executor getThreadPool()
@@ -59,7 +67,7 @@ public class StandardCoordinator implements Coordinator
         return channel;
     }
 
-    public void setAsyncChannel(Channel channel)
+    public void setChannel(Channel channel)
     {
         this.channel = channel;
     }
@@ -87,7 +95,7 @@ public class StandardCoordinator implements Coordinator
     public void onOpen()
     {
         connection.onOpen();
-        threadPool.execute(readyCommand);
+        getThreadPool().execute(onReadyCommand);
     }
 
     public void onReadReady()
@@ -96,7 +104,7 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to read
         needsRead(false);
         // Dispatch the read to another thread
-        threadPool.execute(readCommand);
+        getThreadPool().execute(readCommand);
     }
 
     public void onWriteReady()
@@ -105,23 +113,22 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
-        // TODO: consider using a pooled thread, not the selector thread
-        connection.onWrite();
+        getThreadPool().execute(onWriteCommand);
+    }
+
+    public void onClose()
+    {
+        getThreadPool().execute(closeCommand);
     }
 
     public void needsRead(boolean needsRead)
     {
-        selector.update(channel, SelectionKey.OP_READ, needsRead);
+        getSelector().update(channel, SelectionKey.OP_READ, needsRead);
     }
 
     public void needsWrite(boolean needsWrite)
     {
-        selector.update(channel, SelectionKey.OP_WRITE, needsWrite);
-    }
-
-    public void onRead(ByteBuffer buffer)
-    {
-        connection.onRead(buffer);
+        getSelector().update(channel, SelectionKey.OP_WRITE, needsWrite);
     }
 
     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
@@ -129,12 +136,7 @@ public class StandardCoordinator implements Coordinator
         return channel.write(buffer);
     }
 
-    public void onClose()
-    {
-        threadPool.execute(closeCommand);
-    }
-
-    public void onRemoteClose()
+    protected void onRemoteClose()
     {
         try
         {
@@ -150,7 +152,7 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    public void close(CloseType type)
+    public void close(ChannelStreamType type)
     {
         channel.close(type);
     }
@@ -165,32 +167,101 @@ public class StandardCoordinator implements Coordinator
         {
             logger.info("Unexpected exception", x);
         }
-        finally
+
+        try
         {
             channel.close();
+        }
+        finally
+        {
+            onClosed();
         }
     }
 
     public void onClosed()
     {
-        connection.onClosed();
+        try
+        {
+            connection.onClosed();
+        }
+        catch (Exception x)
+        {
+            logger.info("Unexpected exception", x);
+        }
     }
 
-    protected void ready()
+    protected void onReady()
     {
         connection.onReady();
     }
 
-    protected void read()
+    protected void onWrite()
     {
-        channel.read(readBufferSize);
+        connection.onWrite();
     }
 
-    private class ReadyCommand implements Runnable
+    protected void read()
+    {
+        int read;
+        boolean closed;
+        ByteBuffer buffer = getByteBuffers().acquire(getReadBufferSize(), false);
+        try
+        {
+            int start = buffer.position();
+            closed = channel.read(buffer);
+            read = buffer.position() - start;
+
+            if (read > 0)
+            {
+                if (logger.isDebugEnabled())
+                    logger.debug("Channel {} read {} bytes into {}", new Object[]{channel, read, buffer});
+                buffer.flip();
+                onRead(buffer);
+            }
+        }
+        finally
+        {
+            getByteBuffers().release(buffer);
+        }
+
+        if (closed)
+        {
+            if (!channel.isClosed(ChannelStreamType.INPUT))
+            {
+                if (logger.isDebugEnabled())
+                    logger.debug("Channel {} closed remotely", channel);
+                onRemoteClose();
+            }
+            else
+            {
+                // Input was explicitly closed
+                throw new RuntimeSocketClosedException();
+            }
+        }
+        else if (read == 0)
+        {
+            // We read 0 bytes, we need to re-register for read interest
+            needsRead(true);
+        }
+    }
+
+    protected void onRead(ByteBuffer buffer)
+    {
+        try
+        {
+            connection.onRead(buffer);
+        }
+        catch (Exception x)
+        {
+            logger.info("Unexpected exception", x);
+        }
+    }
+
+    private class OnReadyCommand implements Runnable
     {
         public void run()
         {
-            ready();
+            onReady();
         }
     }
 
@@ -210,6 +281,14 @@ public class StandardCoordinator implements Coordinator
             {
                 logger.debug("Could not read", x);
             }
+        }
+    }
+
+    private class OnWriteCommand implements Runnable
+    {
+        public void run()
+        {
+            onWrite();
         }
     }
 

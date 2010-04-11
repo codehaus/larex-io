@@ -44,9 +44,9 @@ public class StandardClientConnectorTest extends AbstractTestCase
         StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
-            protected void accepted(SocketChannel channel) throws IOException
+            protected void accepted(SocketChannel socketChannel) throws IOException
             {
-                super.accepted(channel);
+                super.accepted(socketChannel);
                 acceptLatch.countDown();
             }
         };

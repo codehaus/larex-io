@@ -23,13 +23,30 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 /**
+ * <p>Implementation of {@link ByteBuffers} that caches and reuses buffers.</p>
+ * <p>Buffers will be created in capacity steps controlled by a factor, to avoid
+ * that a new buffer is created for each different capacity.<br />
+ * Therefore, if the factor is 1024 (the default) and a request for size 2500 arrives,
+ * then a buffer of capacity 3072 (1024 * 3) is created and returned.
+ * If, later on, a request for size 3000 arrives, the same buffer is returned.</p>
+ *
  * @version $Revision$ $Date$
  */
 public class CachedByteBuffers implements ByteBuffers
 {
     private final ConcurrentMap<Integer, Queue<ByteBuffer>> directBuffers = new ConcurrentHashMap<Integer, Queue<ByteBuffer>>();
     private final ConcurrentMap<Integer, Queue<ByteBuffer>> heapBuffers = new ConcurrentHashMap<Integer, Queue<ByteBuffer>>();
-    private final int factor = 1024;
+    private final int factor;
+
+    public CachedByteBuffers()
+    {
+        this(1024);
+    }
+
+    public CachedByteBuffers(int factor)
+    {
+        this.factor = factor;
+    }
 
     public ByteBuffer acquire(int size, boolean direct)
     {
