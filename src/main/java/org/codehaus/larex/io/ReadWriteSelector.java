@@ -102,7 +102,7 @@ public class ReadWriteSelector implements Selector
         return result;
     }
 
-    public void wakeup()
+    protected void wakeup()
     {
         selector.wakeup();
     }

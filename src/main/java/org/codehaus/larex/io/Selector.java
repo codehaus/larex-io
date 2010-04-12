@@ -20,24 +20,49 @@ package org.codehaus.larex.io;
  * <p>{@link Selector} hides the complexity of working with {@link java.nio.channels.Selector}.</p>
  * <p>A {@link Selector} associates an {@link Channel} to a {@link Listener} so that
  * when the I/O system associated to the channel signals readiness for I/O events, the listener is
- * notified. This normally results in the listener to call the channel to perform the actual I/O.</p>
+ * notified.</p>
  *
  * @version $Revision: 903 $ $Date$
  */
 public interface Selector
 {
+    /**
+     * <p>Associates the given {@code channel} to the given {@code listener}, so that when the
+     * I/O system detects activity for the channel, the listener is notified.</p>
+     *
+     * @param channel  the channel to register
+     * @param listener the listener to notify
+     */
     public void register(Channel channel, Listener listener);
 
+    /**
+     * <p>Updates the given {@code channel} by adding or removing interest on the given
+     * {@code operations}.</p>
+     *
+     * @param channel    the channel to update
+     * @param operations the operations to add or remove
+     * @param add        whether to add or remove the operations
+     */
     public void update(Channel channel, int operations, boolean add);
 
+    /**
+     * <p>Closes this selector.</p>
+     * <p>Closing a selector causes all channels registered with it to be closed.</p>
+     */
     public void close();
 
-    public void wakeup();
-
+    /**
+     * <p>Blocks after a close request until this selector terminates, the given {@code timeout}
+     * elapses or the current thread is interrupted.</p>
+     *
+     * @param timeout the maximum time to wait, in milliseconds
+     * @return true if this selector terminated, false if the timeout elapsed
+     * @throws InterruptedException if interrupted while waiting
+     */
     public boolean join(long timeout) throws InterruptedException;
 
     /**
-     * <p>The interface for receiving events from the {@link Selector}.</p>
+     * <p>The interface for receiving events from a {@link Selector}.</p>
      */
     public interface Listener
     {
@@ -48,12 +73,14 @@ public interface Selector
 
         /**
          * <p>Invoked when the {@link Selector} detects that the I/O system is ready to read.</p>
+         *
          * @see #onWriteReady()
          */
         public void onReadReady();
 
         /**
          * <p>Invoked when the {@link Selector} detects that the I/O system is ready to write.</p>
+         *
          * @see #onReadReady()
          */
         public void onWriteReady();

@@ -22,9 +22,11 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * <p>A scheduler that can schedule {@link Task}s to be executed after a given delay.</p>
- * <p>This class provides functionalities similar to {@link ScheduledExecutorService}, but
- * allows to avoid the creation of a new {@link ScheduledFuture} for each scheduled task.<br />
- * This is hopefully better for tasks that are scheduled and immediately cancelled.</p>
+ * <p>This interface provides functionalities similar to {@link ScheduledExecutorService}, but
+ * allows implementations to avoid the creation of a new {@link ScheduledFuture} each time
+ * a task is scheduled.<br />
+ * This is hopefully better for tasks that are scheduled and immediately cancelled, like it
+ * is the case for read and write timeouts.</p>
  *
  * @version $Revision$ $Date$
  */
@@ -62,7 +64,7 @@ public interface Scheduler
     public void shutdown();
 
     /**
-     * <p>Blocks after a shutdown request until this scheduler terminates, the give {@code timeout}
+     * <p>Blocks after a shutdown request until this scheduler terminates, the given {@code timeout}
      * elapses or the current thread is interrupted.</p>
      *
      * @param timeout the maximum time to wait, in milliseconds
