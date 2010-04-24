@@ -51,6 +51,8 @@ public class CachedByteBuffers implements ByteBuffers
     public ByteBuffer acquire(int size, boolean direct)
     {
         int bucket = size / factor;
+        if (size % factor > 0)
+            ++bucket;
         ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = direct ? directBuffers : heapBuffers;
 
         // Avoid to create a new queue every time, just to be discarded immediately
