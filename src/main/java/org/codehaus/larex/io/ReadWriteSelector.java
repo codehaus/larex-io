@@ -75,15 +75,9 @@ public class ReadWriteSelector implements Selector
 
     public void update(Channel channel, int operations, boolean add)
     {
-        UpdateChannel task = new UpdateChannel(channel, operations, add);
-        if (Thread.currentThread() == thread)
-        {
-            task.run();
-        }
-        else
-        {
-            addTask(task);
-        }
+        channel.update(operations, add);
+        if (add && Thread.currentThread() != thread)
+            wakeup();
     }
 
     public void close()
@@ -218,7 +212,6 @@ public class ReadWriteSelector implements Selector
             try
             {
                 logger.debug("Selector loop entered");
-
                 while (selector.isOpen())
                 {
                     try
@@ -232,6 +225,15 @@ public class ReadWriteSelector implements Selector
                         // Closing the selector causes a wakeup, check if we have to exit
                         if (!selector.isOpen())
                             break;
+
+                        // The select may be woken up by selection key updates (for example from NONE to READ interest),
+                        // but most of the times the number of key selected will be zero.
+                        // So we select again without blocking to see if a key is ready.
+                        if (selected == 0)
+                        {
+                            selected = selector.selectNow();
+                            logger.debug("Selector loop re-selecting, {}/{} selected", selected, selector.keys().size());
+                        }
 
                         if (selected > 0)
                         {
