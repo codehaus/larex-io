@@ -17,7 +17,6 @@
 package org.codehaus.larex.io;
 
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -81,11 +80,6 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
                 {
                     return new StandardConnection(coordinator)
                     {
-                        @Override
-                        protected void read(ByteBuffer buffer)
-                        {
-                        }
-
                         @Override
                         public void onRemoteClose()
                         {

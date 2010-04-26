@@ -18,8 +18,7 @@ package org.codehaus.larex.io;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -33,9 +32,12 @@ public class EchoServerMain
     public static void main(String[] args) throws Exception
     {
         int maxThreads = 500;
-        ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
-        InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(null), 8850);
+//        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(maxThreads, maxThreads, 60L, TimeUnit.SECONDS,
+//                new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(maxThreads, maxThreads, 60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<Runnable>(), new CallerBlocksPolicy());
+        threadPool.prestartAllCoreThreads();
+        InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(null), 8080);
 
         Scheduler scheduler = new StandardScheduler();
 

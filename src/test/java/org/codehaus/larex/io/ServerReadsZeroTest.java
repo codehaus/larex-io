@@ -30,7 +30,6 @@ import org.codehaus.larex.io.connector.StandardClientConnector;
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -41,26 +40,10 @@ public class ServerReadsZeroTest extends AbstractTestCase
     @Test
     public void testReadZero() throws Exception
     {
-        final CountDownLatch latch = new CountDownLatch(1);
-        ConnectionFactory connectionFactory = new ConnectionFactory()
-        {
-            public Connection newConnection(Coordinator coordinator)
-            {
-                return new StandardConnection(coordinator)
-                {
-                    @Override
-                    protected void read(ByteBuffer buffer)
-                    {
-                        latch.countDown();
-                    }
-                };
-            }
-        };
-
-        final AtomicInteger reads = new AtomicInteger();
-        final AtomicInteger needReads = new AtomicInteger();
+        final CountDownLatch needReads = new CountDownLatch(5);
+        final CountDownLatch reads = new CountDownLatch(1);
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, getThreadPool(), getScheduler())
+        StandardServerConnector serverConnector = new StandardServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
             protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
@@ -93,14 +76,14 @@ public class ServerReadsZeroTest extends AbstractTestCase
                     @Override
                     protected void onRead(ByteBuffer buffer)
                     {
-                        reads.incrementAndGet();
                         super.onRead(buffer);
+                        reads.countDown();
                     }
 
                     @Override
                     public void needsRead(boolean needsRead)
                     {
-                        needReads.incrementAndGet();
+                        needReads.countDown();
                         super.needsRead(needsRead);
                     }
                 };
@@ -111,20 +94,19 @@ public class ServerReadsZeroTest extends AbstractTestCase
         try
         {
             StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
-            Endpoint<IdleConnection> endpoint = connector.newEndpoint(new IdleConnection.Factory());
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            assertTrue(connection.awaitReady(1000));
             try
             {
                 ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
-                connection.write(buffer);
-                assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                connection.flush(buffer);
+                assertTrue(reads.await(1000, TimeUnit.MILLISECONDS));
 
-                assertEquals(1, reads.get());
-
-                // Five needsRead calls: at beginning to enable the reads, then to disable
-                // after reading 0 to re-enable the reads, and again to disable
+                // Five needsRead calls: at beginning to enable the reads, then to disable;
+                // after reading 0 to re-enable the reads, and again to disable;
                 // then to re-enable them
-                assertEquals(5, needReads.get());
+                assertTrue(needReads.await(1000, TimeUnit.MILLISECONDS));
             }
             finally
             {

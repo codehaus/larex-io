@@ -36,6 +36,8 @@ public class StandardCoordinator implements Coordinator
     private final Runnable readCommand = new ReadCommand();
     private final Runnable onWriteCommand = new OnWriteCommand();
     private final Runnable closeCommand = new CloseCommand();
+    private final Interceptor headInterceptor = new Interceptor.Forwarder();
+    private final Interceptor tailInterceptor = new StandardInterceptor();
     private volatile Channel channel;
     private volatile Connection connection;
     private volatile int readBufferSize = 1024;
@@ -45,6 +47,7 @@ public class StandardCoordinator implements Coordinator
         this.selector = selector;
         this.byteBuffers = byteBuffers;
         this.threadPool = threadPool;
+        headInterceptor.setNext(tailInterceptor);
     }
 
     protected Selector getSelector()
@@ -92,9 +95,32 @@ public class StandardCoordinator implements Coordinator
         this.readBufferSize = size;
     }
 
+    public void addInterceptor(Interceptor interceptor)
+    {
+        Interceptor target = headInterceptor;
+        while (target.getNext() != tailInterceptor)
+            target = target.getNext();
+        target.setNext(interceptor);
+        interceptor.setNext(tailInterceptor);
+    }
+
+    public boolean removeInterceptor(Interceptor interceptor)
+    {
+        Interceptor target = headInterceptor;
+        while (target.getNext() != tailInterceptor && target.getNext() != interceptor)
+            target = target.getNext();
+        if (target.getNext() == interceptor)
+        {
+            target.setNext(interceptor.getNext());
+            interceptor.setNext(null);
+            return true;
+        }
+        return false;
+    }
+
     public void onOpen()
     {
-        connection.onOpen();
+        getConnection().openEvent(); // TODO: forward this also to interceptor ?
         getThreadPool().execute(onReadyCommand);
     }
 
@@ -123,28 +149,24 @@ public class StandardCoordinator implements Coordinator
 
     public void needsRead(boolean needsRead)
     {
-        getSelector().update(channel, SelectionKey.OP_READ, needsRead);
+        getSelector().update(getChannel(), SelectionKey.OP_READ, needsRead);
     }
 
     public void needsWrite(boolean needsWrite)
     {
-        getSelector().update(channel, SelectionKey.OP_WRITE, needsWrite);
+        getSelector().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
     }
 
     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
     {
-        return channel.write(buffer);
+        return getInterceptor().write(buffer);
     }
 
     protected void onRemoteClose()
     {
         try
         {
-            connection.onRemoteClose();
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
+            getInterceptor().onRemoteClose();
         }
         finally
         {
@@ -154,50 +176,30 @@ public class StandardCoordinator implements Coordinator
 
     public void close(ChannelStreamType type)
     {
-        channel.close(type);
+        getInterceptor().close(type);
     }
 
     public void close()
     {
+        getInterceptor().onClosing();
         try
         {
-            connection.onClose();
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
-        }
-
-        try
-        {
-            channel.close();
+            getInterceptor().close();
         }
         finally
         {
-            onClosed();
-        }
-    }
-
-    public void onClosed()
-    {
-        try
-        {
-            connection.onClosed();
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
+            getInterceptor().onClosed();
         }
     }
 
     protected void onReady()
     {
-        connection.onReady();
+        getInterceptor().onReady();
     }
 
     protected void onWrite()
     {
-        connection.onWrite();
+        getInterceptor().onWrite();
     }
 
     protected void read()
@@ -207,16 +209,24 @@ public class StandardCoordinator implements Coordinator
         ByteBuffer buffer = getByteBuffers().acquire(getReadBufferSize(), false);
         try
         {
-            int start = buffer.position();
-            closed = channel.read(buffer);
-            read = buffer.position() - start;
-
-            if (read > 0)
+            // The buffer can be smaller than the data available, so read until we cannot read anymore.
+            while (true)
             {
-                if (logger.isDebugEnabled())
-                    logger.debug("Channel {} read {} bytes into {}", new Object[]{channel, read, buffer});
-                buffer.flip();
-                onRead(buffer);
+                int start = buffer.position();
+                closed = getChannel().read(buffer);
+                read = buffer.position() - start;
+
+                if (read > 0)
+                {
+                    if (logger.isDebugEnabled())
+                        logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
+                    buffer.flip();
+                    onRead(buffer);
+                    buffer.clear();
+                }
+
+                if (read == 0 || closed)
+                    break;
             }
         }
         finally
@@ -226,10 +236,11 @@ public class StandardCoordinator implements Coordinator
 
         if (closed)
         {
-            if (!channel.isClosed(ChannelStreamType.INPUT))
+            // TODO: improve this: the if may not be needed
+            if (!getChannel().isClosed(ChannelStreamType.INPUT))
             {
                 if (logger.isDebugEnabled())
-                    logger.debug("Channel {} closed remotely", channel);
+                    logger.debug("Channel {} closed remotely", getChannel());
                 onRemoteClose();
             }
             else
@@ -238,7 +249,7 @@ public class StandardCoordinator implements Coordinator
                 throw new RuntimeSocketClosedException();
             }
         }
-        else if (read == 0)
+        else
         {
             // We read 0 bytes, we need to re-register for read interest
             needsRead(true);
@@ -249,12 +260,17 @@ public class StandardCoordinator implements Coordinator
     {
         try
         {
-            connection.onRead(buffer);
+            getInterceptor().onRead(buffer);
         }
         catch (Exception x)
         {
             logger.info("Unexpected exception", x);
         }
+    }
+
+    protected Interceptor getInterceptor()
+    {
+        return headInterceptor;
     }
 
     private class OnReadyCommand implements Runnable
@@ -304,6 +320,130 @@ public class StandardCoordinator implements Coordinator
             {
                 logger.info("Unexpected exception", x);
             }
+        }
+    }
+
+    private class StandardInterceptor implements Interceptor
+    {
+        public Interceptor getNext()
+        {
+            return null;
+        }
+
+        public void setNext(Interceptor interceptor)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        public void onReady()
+        {
+            try
+            {
+                getConnection().readyEvent();
+            }
+            catch (Exception x)
+            {
+                logger.debug("Unexpected exception", x);
+            }
+        }
+
+        public void onReadTimeout()
+        {
+            try
+            {
+                getConnection().readTimeoutEvent();
+            }
+            catch (Exception x)
+            {
+                logger.debug("Unexpected exception", x);
+            }
+        }
+
+        public void onRead(ByteBuffer buffer)
+        {
+            try
+            {
+                getConnection().readEvent(buffer);
+            }
+            catch (Exception x)
+            {
+                logger.debug("Unexpected exception", x);
+            }
+        }
+
+        public void onWrite()
+        {
+            try
+            {
+                getConnection().writeEvent();
+            }
+            catch (Exception x)
+            {
+                logger.debug("Unexpected exception", x);
+            }
+        }
+
+        public void onWriteTimeout()
+        {
+            try
+            {
+                getConnection().writeTimeoutEvent();
+            }
+            catch (Exception x)
+            {
+                logger.debug("Unexpected exception", x);
+            }
+        }
+
+        public int write(ByteBuffer buffer)
+        {
+            return getChannel().write(buffer);
+        }
+
+        public void onRemoteClose()
+        {
+            try
+            {
+                getConnection().remoteCloseEvent();
+            }
+            catch (Exception x)
+            {
+                logger.info("Unexpected exception", x);
+            }
+        }
+
+        public void onClosing()
+        {
+            try
+            {
+                getConnection().closingEvent();
+            }
+            catch (Exception x)
+            {
+                logger.info("Unexpected exception", x);
+            }
+        }
+
+        public void onClosed()
+        {
+            try
+            {
+                getConnection().closedEvent();
+            }
+            catch (Exception x)
+            {
+                logger.info("Unexpected exception", x);
+            }
+        }
+
+        public void close(ChannelStreamType type)
+        {
+            getChannel().close(type);
+        }
+
+        public void close()
+        {
+            getChannel().close();
         }
     }
 }

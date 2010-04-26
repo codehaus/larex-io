@@ -21,37 +21,50 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * TODO: document that this is a per-instance thread local
+ *
  * @version $Revision$ $Date$
  */
 public class ThreadLocalByteBuffers implements ByteBuffers
 {
-    private final int factor = 1024;
+    private ThreadLocal<Map<Integer, ByteBuffer>> heapBuffers = new ThreadLocal<Map<Integer, ByteBuffer>>()
+    {
+        @Override
+        protected Map<Integer, ByteBuffer> initialValue()
+        {
+            return new HashMap<Integer, ByteBuffer>();
+        }
+    };
+    private ThreadLocal<Map<Integer, ByteBuffer>> directBuffers = new ThreadLocal<Map<Integer, ByteBuffer>>()
+    {
+        @Override
+        protected Map<Integer, ByteBuffer> initialValue()
+        {
+            return new HashMap<Integer, ByteBuffer>();
+        }
+    };
+    private final int factor;
 
-    private static ThreadLocal<Map<Integer, ByteBuffer>> heapBuffers = new ThreadLocal<Map<Integer, ByteBuffer>>()
+    public ThreadLocalByteBuffers()
     {
-        @Override
-        protected Map<Integer, ByteBuffer> initialValue()
-        {
-            return new HashMap<Integer, ByteBuffer>();
-        }
-    };
-    private static ThreadLocal<Map<Integer, ByteBuffer>> directBuffers = new ThreadLocal<Map<Integer, ByteBuffer>>()
+        this(1024);
+    }
+
+    public ThreadLocalByteBuffers(int factor)
     {
-        @Override
-        protected Map<Integer, ByteBuffer> initialValue()
-        {
-            return new HashMap<Integer, ByteBuffer>();
-        }
-    };
+        this.factor = factor;
+    }
 
     public ByteBuffer acquire(int size, boolean direct)
     {
         int bucket = size / factor;
+        if (size % factor > 0)
+            ++bucket;
         Map<Integer, ByteBuffer> byteBuffers = direct ? directBuffers.get() : heapBuffers.get();
         ByteBuffer result = byteBuffers.get(bucket);
         if (result == null)
         {
-            int capacity = (bucket + 1) * factor;
+            int capacity = bucket * factor;
             result = direct ? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
             byteBuffers.put(bucket, result);
         }

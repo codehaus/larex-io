@@ -65,7 +65,7 @@ public class StandardClientConnector
         return new ReadWriteSelector();
     }
 
-    public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
+    public <C extends Connection> Endpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
     {
         Selector selector = chooseSelector(selectors);
         return newEndpoint(selector, connectionFactory, byteBuffers, threadPool, scheduler);
@@ -81,5 +81,17 @@ public class StandardClientConnector
     protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
         return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler);
+    }
+
+    public void close()
+    {
+        for (Selector selector : selectors)
+            selector.close();
+    }
+
+    public void join(long timeout) throws InterruptedException
+    {
+        for (Selector selector : selectors)
+            selector.join(timeout);
     }
 }

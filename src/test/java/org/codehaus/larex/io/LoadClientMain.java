@@ -205,6 +205,7 @@ public class LoadClientMain
         minLatency.set(Long.MAX_VALUE);
         maxLatency.set(0L);
         totLatency.set(0L);
+        latencies.clear();
     }
 
     private void updateLatencies(long start, long end)
@@ -334,7 +335,7 @@ public class LoadClientMain
         }
 
         @Override
-        protected void read(ByteBuffer buffer)
+        protected void onRead(ByteBuffer buffer)
         {
             while (buffer.hasRemaining())
             {
@@ -377,7 +378,7 @@ public class LoadClientMain
             buffer.put((byte)0x7F);
             buffer.flip();
 
-            write(buffer);
+            flush(buffer);
         }
     }
 }

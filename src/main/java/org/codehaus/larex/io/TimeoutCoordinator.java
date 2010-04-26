@@ -123,8 +123,7 @@ public class TimeoutCoordinator extends StandardCoordinator
         {
             try
             {
-                logger.debug("Notifying read timeout");
-                getConnection().onReadTimeout();
+                getInterceptor().onReadTimeout();
             }
             finally
             {
@@ -135,7 +134,7 @@ public class TimeoutCoordinator extends StandardCoordinator
 
     protected void onWriteTimeout()
     {
-        getConnection().onWriteTimeout();
+        getInterceptor().onWriteTimeout();
     }
 
     private enum ReadState

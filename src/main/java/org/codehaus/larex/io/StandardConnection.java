@@ -16,46 +16,43 @@
 
 package org.codehaus.larex.io;
 
-import java.nio.ByteBuffer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @version $Revision$ $Date$
  */
-public abstract class StandardConnection extends WritableConnection
+public class StandardConnection extends FlushableConnection
 {
+    private final CountDownLatch ready = new CountDownLatch(1);
+
     public StandardConnection(Coordinator coordinator)
     {
         super(coordinator);
     }
 
-    public final void onOpen()
+    void doOnOpen()
     {
         getCoordinator().needsRead(true);
     }
 
-    public void onReady()
+    @Override
+    void doOnReady()
     {
+        super.doOnReady();
+        ready.countDown();
     }
 
-    public void onRead(ByteBuffer buffer)
+    public boolean awaitReady(long timeout) throws InterruptedException
     {
-        try
-        {
-            read(buffer);
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
-        }
-        finally
-        {
-            getCoordinator().needsRead(true);
-        }
+        return ready.await(timeout, TimeUnit.MILLISECONDS);
     }
 
-    public void onReadTimeout()
+    public static class Factory implements ConnectionFactory<StandardConnection>
     {
+        public StandardConnection newConnection(Coordinator coordinator)
+        {
+            return new StandardConnection(coordinator);
+        }
     }
-
-    protected abstract void read(ByteBuffer buffer);
 }

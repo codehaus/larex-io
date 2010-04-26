@@ -26,9 +26,9 @@ import org.codehaus.larex.io.Connection;
 public abstract class Endpoint<T extends Connection>
 {
     private InetSocketAddress bindAddress;
-    private int connectTimeout;
-    private int readTimeout;
-    private int writeTimeout;
+    private long connectTimeout;
+    private long readTimeout;
+    private long writeTimeout;
 
     public InetSocketAddress getBindAddress()
     {
@@ -40,32 +40,32 @@ public abstract class Endpoint<T extends Connection>
         this.bindAddress = bindAddress;
     }
 
-    public int getConnectTimeout()
+    public long getConnectTimeout()
     {
         return connectTimeout;
     }
 
-    public void setConnectTimeout(int connectTimeout)
+    public void setConnectTimeout(long connectTimeout)
     {
         this.connectTimeout = connectTimeout;
     }
 
-    public int getReadTimeout()
+    public long getReadTimeout()
     {
         return readTimeout;
     }
 
-    public void setReadTimeout(int readTimeout)
+    public void setReadTimeout(long readTimeout)
     {
         this.readTimeout = readTimeout;
     }
 
-    public int getWriteTimeout()
+    public long getWriteTimeout()
     {
         return writeTimeout;
     }
 
-    public void setWriteTimeout(int writeTimeout)
+    public void setWriteTimeout(long writeTimeout)
     {
         this.writeTimeout = writeTimeout;
     }

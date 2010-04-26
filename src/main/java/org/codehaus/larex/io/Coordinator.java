@@ -43,6 +43,9 @@ public interface Coordinator extends Selector.Listener
      */
     public void setReadBufferSize(int size);
 
+    public void addInterceptor(Interceptor interceptor);
+    public boolean removeInterceptor(Interceptor interceptor);
+
     /**
      * <p>Asks the I/O system to register (if {@code needsRead} is true) or
      * to deregister (if {@code needsRead} is false) for interest in read events.</p>

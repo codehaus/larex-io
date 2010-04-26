@@ -169,6 +169,8 @@ public class StandardServerConnector
 
     public boolean join(long timeout) throws InterruptedException
     {
+        for (Selector selector : selectors)
+            selector.join(timeout);
         acceptorThread.join(timeout);
         return !acceptorThread.isAlive();
     }

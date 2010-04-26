@@ -75,9 +75,30 @@ public class ReadWriteSelector implements Selector
 
     public void update(Channel channel, int operations, boolean add)
     {
-        channel.update(operations, add);
-        if (add && Thread.currentThread() != thread)
-            wakeup();
+        // It is quite important, performance wise, that the operations
+        // update is performed without creating a task, and reducing
+        // the selector wake-ups at minimum.
+        // Updating the selection key operations does not by itself
+        // automatically wake up the selector.
+        // Removing operations interest is done in the selector thread
+        // and *before* the selector waits again on a select() call.
+        // This ensures that the selector has an updated status for the
+        // selection key.
+        // Adding operations interest, on the other hand, when not done
+        // from the selector thread, needs to wake up the selector so
+        // that it can call select() and notice that the selection key
+        // status has changed.
+
+        try
+        {
+            channel.update(operations, add);
+            if (add && Thread.currentThread() != thread)
+                wakeup();
+        }
+        catch (RuntimeSocketClosedException x)
+        {
+            logger.debug("Ignoring update for closed channel {}", channel);
+        }
     }
 
     public void close()
@@ -158,32 +179,6 @@ public class ReadWriteSelector implements Selector
         }
     }
 
-    private class UpdateChannel implements Runnable
-    {
-        private final Channel channel;
-        private final int operations;
-        private final boolean add;
-
-        public UpdateChannel(Channel channel, int operations, boolean add)
-        {
-            this.channel = channel;
-            this.operations = operations;
-            this.add = add;
-        }
-
-        public void run()
-        {
-            try
-            {
-                channel.update(operations, add);
-            }
-            catch (RuntimeSocketClosedException x)
-            {
-                logger.debug("Ignoring update for closed channel {}", channel);
-            }
-        }
-    }
-
     private class Close implements Runnable
     {
         public void run()
@@ -226,9 +221,13 @@ public class ReadWriteSelector implements Selector
                         if (!selector.isOpen())
                             break;
 
-                        // The select may be woken up by selection key updates (for example from NONE to READ interest),
-                        // but most of the times the number of key selected will be zero.
-                        // So we select again without blocking to see if a key is ready.
+                        // The select() may be woken up by selection key updates (for example
+                        // from NONE to READ interest), but most of the times the number of
+                        // keys selected will be zero.
+                        // Therefore we select again without blocking so that the selector
+                        // will notice that the selection key was updated.
+                        // This gives an good performance boost (benchmark with and without
+                        // to believe it).
                         if (selected == 0)
                         {
                             selected = selector.selectNow();

@@ -21,8 +21,8 @@ import java.nio.channels.ClosedByInterruptException;
 
 /**
  * <p>Implementation of {@link Connection} that provides blocking read functionality
- * and inherits write and close functionalities.</p>
- * <p>User code must implement {@link #onReady()}, typically in the following way:</p>
+ * and inherits flush and close functionalities.</p>
+ * <p>User code must implement {@link #readyEvent()}, typically in the following way:</p>
  * <pre>
  * public void onReady()
  * {
@@ -32,13 +32,13 @@ import java.nio.channels.ClosedByInterruptException;
  *
  *     ByteBuffer writeBuffer = ByteBuffer.allocate(256);
  *     // Fill the writeBuffer with response data
- *     write(writeBuffer);
+ *     flush(writeBuffer);
  * }
  * </pre>
  *
  * @version $Revision$ $Date$
  */
-public abstract class BlockingConnection extends WritableConnection
+public abstract class BlockingConnection extends FlushableConnection
 {
     private ByteBuffer buffer;
     private ReadState readState = ReadState.WAIT;
@@ -49,13 +49,6 @@ public abstract class BlockingConnection extends WritableConnection
     }
 
     public abstract void onReady();
-
-    /**
-     * <p>Overridden to implement the blocking read functionality.</p>
-     */
-    public final void onOpen()
-    {
-    }
 
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
@@ -136,8 +129,9 @@ public abstract class BlockingConnection extends WritableConnection
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
      */
-    public final void onRemoteClose()
+    void doOnRemoteClose()
     {
+        super.doOnRemoteClose();
         synchronized (this)
         {
             readState = ReadState.REMOTE_CLOSE;
@@ -146,14 +140,28 @@ public abstract class BlockingConnection extends WritableConnection
     }
 
     @Override
+    void doClose(ChannelStreamType type)
+    {
+        super.doClose(type);
+        if (type == ChannelStreamType.INPUT)
+        {
+            synchronized (this)
+            {
+                readState = ReadState.CLOSE;
+                notify();
+            }
+        }
+    }
+
+    @Override
     void doClose()
     {
+        super.doClose();
         synchronized (this)
         {
             readState = ReadState.CLOSE;
             notify();
         }
-        super.doClose();
     }
 
     private enum ReadState

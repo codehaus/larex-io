@@ -63,7 +63,7 @@ public class StandardClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(coordinator)
                     {
                         @Override
-                        protected void read(ByteBuffer buffer)
+                        protected void onRead(ByteBuffer buffer)
                         {
                             responseLatch.countDown();
                         }
@@ -72,10 +72,11 @@ public class StandardClientConnectorTest extends AbstractTestCase
             });
 
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            assertTrue(connection.awaitReady(1000));
             try
             {
                 assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));
-                connection.write(ByteBuffer.wrap(new byte[]{1}));
+                connection.flush(ByteBuffer.wrap(new byte[]{1}));
                 assertTrue(responseLatch.await(1000, TimeUnit.MILLISECONDS));
             }
             finally

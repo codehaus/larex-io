@@ -43,17 +43,17 @@ import org.slf4j.LoggerFactory;
 /**
  * @version $Revision$ $Date$
  */
-public class StandardEndpoint<T extends Connection> extends Endpoint<T>
+public class StandardEndpoint<C extends Connection> extends Endpoint<C>
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final SocketChannel channel;
     private final Selector selector;
-    private final ConnectionFactory<T> connectionFactory;
+    private final ConnectionFactory<C> connectionFactory;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
     private final Scheduler scheduler;
 
-    public StandardEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+    public StandardEndpoint(Selector selector, ConnectionFactory<C> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
         try
         {
@@ -70,8 +70,33 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
         }
     }
 
+    public SocketChannel getSocketChannel()
+    {
+        return channel;
+    }
+
+    protected Selector getSelector()
+    {
+        return selector;
+    }
+
+    protected ByteBuffers getByteBuffers()
+    {
+        return byteBuffers;
+    }
+
+    protected Executor getThreadPool()
+    {
+        return threadPool;
+    }
+
+    protected Scheduler getScheduler()
+    {
+        return scheduler;
+    }
+
     @Override
-    public T connect(InetSocketAddress address)
+    public C connect(InetSocketAddress address)
     {
         try
         {
@@ -82,13 +107,13 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
                 socket.bind(bindAddress);
                 logger.debug("{} bound to {}", this, bindAddress);
             }
-            int connectTimeout = getConnectTimeout();
+            long connectTimeout = getConnectTimeout();
             if (connectTimeout < 0)
                 connectTimeout = 0;
             logger.debug("{} connecting to {} (timeout {})", new Object[]{this, address, connectTimeout});
-            socket.connect(address, connectTimeout);
+            socket.connect(address, Long.valueOf(connectTimeout).intValue());
             logger.debug("{} connected to {}", this, address);
-            return connected(channel);
+            return connected();
         }
         catch (AlreadyConnectedException x)
         {
@@ -112,36 +137,41 @@ public class StandardEndpoint<T extends Connection> extends Endpoint<T>
         }
     }
 
-    protected T connected(SocketChannel socketChannel) throws IOException
+    protected C connected() throws IOException
     {
-        socketChannel.configureBlocking(false);
+        getSocketChannel().configureBlocking(false);
 
-        Coordinator coordinator = newCoordinator(selector, byteBuffers, threadPool, scheduler);
+        Coordinator coordinator = newCoordinator();
 
-        Channel channel = newChannel(socketChannel, coordinator);
+        Channel channel = newChannel(coordinator);
         coordinator.setChannel(channel);
 
-        T connection = connectionFactory.newConnection(coordinator);
+        C connection = newConnection(coordinator);
         coordinator.setConnection(connection);
 
-        register(selector, channel, coordinator);
+        register(channel, coordinator);
 
         return connection;
     }
 
-    protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+    protected C newConnection(Coordinator coordinator)
     {
-        return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
+        return connectionFactory.newConnection(coordinator);
     }
 
-    protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
+    protected Coordinator newCoordinator()
     {
-        return new StandardChannel(channel, coordinator);
+        return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout());
     }
 
-    protected void register(Selector selector, Channel channel, Coordinator coordinator)
+    protected Channel newChannel(Coordinator coordinator)
     {
-        selector.register(channel, coordinator);
+        return new StandardChannel(getSocketChannel(), coordinator);
+    }
+
+    protected void register(Channel channel, Coordinator coordinator)
+    {
+        getSelector().register(channel, coordinator);
     }
 
     private void close()

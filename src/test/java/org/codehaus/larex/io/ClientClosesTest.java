@@ -48,11 +48,6 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    protected void read(ByteBuffer buffer)
-                    {
-                    }
-
-                    @Override
                     public void onRemoteClose()
                     {
                         closeLatch.countDown();
@@ -64,31 +59,17 @@ public class ClientClosesTest extends AbstractTestCase
 
         try
         {
-            final CountDownLatch openLatch = new CountDownLatch(1);
             StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
-            {
-                public StandardConnection newConnection(Coordinator coordinator)
-                {
-                    return new StandardConnection(coordinator)
-                    {
-                        @Override
-                        public void onReady()
-                        {
-                            openLatch.countDown();
-                        }
-
-                        @Override
-                        protected void read(ByteBuffer buffer)
-                        {
-                        }
-                    };
-                }
-            });
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-            await(openLatch, 1000);
-            connection.close();
-            await(closeLatch, 1000);
+            assertTrue(connection.awaitReady(1000));
+
+            // In JDK 5, closing the connection does not cause a FIN to be sent to the server,
+            // see http://bugs.sun.com/view_bug.do?bug_id=4960962.
+            // The only option is to call softClose() or close(ChannelStreamType.OUTPUT)
+//            connection.close();
+            connection.softClose(1000);
+            assertTrue(await(closeLatch, 1000));
         }
         finally
         {
@@ -120,9 +101,9 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    protected void read(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
-                        write(ByteBuffer.wrap(new byte[]{1}));
+                        flush(ByteBuffer.wrap(new byte[]{1}));
                     }
                 };
             }
@@ -168,9 +149,9 @@ public class ClientClosesTest extends AbstractTestCase
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+                        protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
                                 protected void read()
@@ -205,7 +186,7 @@ public class ClientClosesTest extends AbstractTestCase
                     return new StandardConnection(coordinator)
                     {
                         @Override
-                        protected void read(ByteBuffer buffer)
+                        protected void onRead(ByteBuffer buffer)
                         {
                             read.set(true);
                         }
@@ -213,10 +194,11 @@ public class ClientClosesTest extends AbstractTestCase
                 }
             });
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            assertTrue(connection.awaitReady(1000));
             try
             {
                 // Trigger server-side read, which will write to the client
-                connection.write(ByteBuffer.wrap(new byte[]{1}));
+                connection.flush(ByteBuffer.wrap(new byte[]{1}));
 
                 // Wait until the client is ready to read from server
                 if (await(latch1, 1000))
@@ -255,9 +237,9 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    protected void read(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
-                        write(ByteBuffer.wrap(new byte[]{1}));
+                        flush(ByteBuffer.wrap(new byte[]{1}));
                     }
 
                     @Override
@@ -284,9 +266,9 @@ public class ClientClosesTest extends AbstractTestCase
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+                        protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
                                 protected void read()
@@ -313,7 +295,7 @@ public class ClientClosesTest extends AbstractTestCase
                     return new StandardConnection(coordinator)
                     {
                         @Override
-                        protected void read(ByteBuffer buffer)
+                        protected void onRead(ByteBuffer buffer)
                         {
                             ClientClosesTest.this.logger.debug("Step 3 releasing");
                             latch3.countDown();
@@ -329,10 +311,11 @@ public class ClientClosesTest extends AbstractTestCase
                 }
             });
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            assertTrue(connection.awaitReady(1000));
             try
             {
                 // Trigger server-side read, which will write to the client
-                connection.write(ByteBuffer.wrap(new byte[]{1}));
+                connection.flush(ByteBuffer.wrap(new byte[]{1}));
 
                 // Wait until the client is ready to read from server
                 if (await(latch1, 1000))

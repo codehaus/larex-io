@@ -85,11 +85,13 @@ public class StandardChannel implements Channel
         {
             SelectionKey selectionKey = this.selectionKey;
             int oldOperations = selectionKey.interestOps();
+            int newOperations;
             if (add)
-                selectionKey.interestOps(oldOperations | operations);
+                newOperations = oldOperations | operations;
             else
-                selectionKey.interestOps(oldOperations & ~operations);
-            int newOperations = selectionKey.interestOps();
+                newOperations = oldOperations & ~operations;
+            if (newOperations != oldOperations)
+                selectionKey.interestOps(newOperations);
             if (debug)
                 logger.debug("Channel {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
         }

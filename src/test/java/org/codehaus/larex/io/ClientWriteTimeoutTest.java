@@ -27,6 +27,7 @@ import org.codehaus.larex.io.connector.StandardEndpoint;
 import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.Test;
 
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -38,7 +39,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
     public void testWriteTimeout() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new IdleConnection.Factory(), getThreadPool(), getScheduler());
+        StandardServerConnector serverConnector = new StandardServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler());
         int port = serverConnector.listen();
         try
         {
@@ -50,9 +51,9 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                     return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
                     {
                         @Override
-                        protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+                        protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout())
                             {
                                 public AtomicInteger writes = new AtomicInteger(0);
 
@@ -89,14 +90,16 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                     };
                 }
             };
-            Endpoint<IdleConnection> endpoint = connector.newEndpoint(new IdleConnection.Factory());
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
             endpoint.setWriteTimeout(1000);
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            assertTrue(connection.awaitReady(1000));
+
             try
             {
                 try
                 {
-                    connection.write(ByteBuffer.wrap(new byte[]{1, 2}));
+                    connection.flush(ByteBuffer.wrap(new byte[]{1, 2}));
                     fail();
                 }
                 catch (RuntimeSocketTimeoutException x)

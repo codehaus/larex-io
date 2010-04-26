@@ -48,13 +48,8 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
                     @Override
                     public void onReady()
                     {
-                        write(ByteBuffer.wrap(new byte[]{1}));
+                        flush(ByteBuffer.wrap(new byte[]{1}));
                         close();
-                    }
-
-                    @Override
-                    protected void read(ByteBuffer buffer)
-                    {
                     }
                 };
             }
@@ -74,7 +69,7 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    protected void read(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
                         if (!tester.compareAndSet(0, 1))
                             failure.set(1);

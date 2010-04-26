@@ -21,9 +21,9 @@ import java.nio.ByteBuffer;
 /**
  * <p>{@link Connection} represents an active connection with a remote peer and it is the recipient
  * of events that are related to the activity happening on the connection.</p>
- * <p>These events involve {@link #onOpen() connection opening}, {@link #onRead(ByteBuffer) read}
- * and {@link #onWrite() write} events, close events ({@link #onRemoteClose() remote} and
- * {@link #onClose() local}) and timeout events.</p>
+ * <p>These events involve {@link #openEvent() connection opening}, {@link #readEvent(ByteBuffer) read}
+ * and {@link #writeEvent() write} events, close events ({@link #remoteCloseEvent() remote} and
+ * {@link #closingEvent() local}) and timeout events.</p>
  * <p>User code would prefer to extend from {@link Connection} implementations such as
  * {@link StandardConnection} or {@link BlockingConnection}.</p>
  * <br />
@@ -39,47 +39,47 @@ public interface Connection
     /**
      * <p>Callback method called when this connection is opened.</p>
      */
-    void onOpen();
+    void openEvent();
 
     /**
      * <p>Callback method called after the connection has been opened.</p>
      */
-    void onReady();
+    void readyEvent();
 
     /**
      * <p>Callback method called when this connection has read bytes sent from the remote peer.</p>
      * @param buffer the buffer containing the bytes read
      */
-    void onRead(ByteBuffer buffer);
+    void readEvent(ByteBuffer buffer);
 
     /**
      * <p>Callback method called when this connection times out while waiting to read bytes.<p>
      */
-    void onReadTimeout();
+    void readTimeoutEvent();
 
     /**
      * <p>Callback method called when this connection is again ready to write, after having been
      * write blocked.</p>
      */
-    void onWrite();
+    void writeEvent();
 
     /**
      * <p>Callback method called when this connection times out while waiting to write bytes.<p>
      */
-    void onWriteTimeout();
+    void writeTimeoutEvent();
 
     /**
      * <p>Callback method called when this connection detects that the remote end has been closed.</p>
      */
-    void onRemoteClose();
+    void remoteCloseEvent();
 
     /**
      * <p>Callback called when this connection is about to be closed.</p>
      */
-    void onClose();
+    void closingEvent();
 
     /**
      * <p>Callback called when this connection has been closed.</p>
      */
-    void onClosed();
+    void closedEvent();
 }

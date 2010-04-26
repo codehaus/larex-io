@@ -107,12 +107,13 @@ public class ServerWritesZeroTest extends AbstractTestCase
         try
         {
             StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
-            Endpoint<IdleConnection> endpoint = connector.newEndpoint(new IdleConnection.Factory());
+            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            assertTrue(connection.awaitReady(1000));
             try
             {
                 ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
-                connection.write(buffer);
+                connection.flush(buffer);
 
                 assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 

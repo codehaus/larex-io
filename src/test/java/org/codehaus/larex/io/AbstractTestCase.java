@@ -18,6 +18,7 @@ package org.codehaus.larex.io;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -41,10 +42,12 @@ public abstract class AbstractTestCase
     }
 
     @After
-    public void destroy()
+    public void destroy() throws Exception
     {
         scheduler.shutdown();
+        scheduler.join(1000);
         threadPool.shutdown();
+        threadPool.awaitTermination(1000, TimeUnit.MILLISECONDS);
     }
 
     public ExecutorService getThreadPool()

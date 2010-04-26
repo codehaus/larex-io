@@ -17,7 +17,6 @@
 package org.codehaus.larex.io;
 
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -49,11 +48,6 @@ public class ClientReadTimeoutTest extends AbstractTestCase
                 {
                     return new StandardConnection(coordinator)
                     {
-                        @Override
-                        protected void read(ByteBuffer buffer)
-                        {
-                        }
-
                         @Override
                         public void onReadTimeout()
                         {

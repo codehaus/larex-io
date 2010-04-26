@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * is closed (via {@link SocketChannel#close()}).</p>
  * <p>When a connection is {@link #softClose(long) soft closed}, only its output is shut down (via
  * {@link Socket#shutdownOutput()}), but not its input; the remote end of the connection
- * detects this ({@link #onRemoteClose()} is invoked, or equivalently a raw socket would read -1),
+ * detects this ({@link #remoteCloseEvent()} is invoked, or equivalently a raw socket would read -1),
  * and may optionally decide to write the last data before hard closing the connection.<br />
  * The connection reads the last data sent by the remote end, then detects that the remote end
  * was closed and can now hard close the connection.<br />
@@ -41,10 +41,9 @@ import org.slf4j.LoggerFactory;
  *
  * @version $Revision$ $Date$
  */
-public abstract class ClosableConnection implements Connection
+public abstract class ClosableConnection extends AbstractConnection
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
-    protected final boolean debug = logger.isDebugEnabled();
     private final Coordinator coordinator;
     private volatile CountDownLatch softClose;
 
@@ -61,36 +60,13 @@ public abstract class ClosableConnection implements Connection
         return coordinator;
     }
 
-    public void onRemoteClose()
-    {
-    }
-
-    public void onClose()
-    {
-    }
-
-    /**
-     * <p>Overridden to implement the soft close functionality.</p>
-     * <p>Override {@link #onClosedHook()} instead.</p>
-     */
-    public final void onClosed()
-    {
-        doOnClosed();
-        onClosedHook();
-    }
-
+    @Override
     void doOnClosed()
     {
+        super.doOnClosed();
         CountDownLatch softClose = this.softClose;
         if (softClose != null)
             softClose.countDown();
-    }
-
-    /**
-     * <p>Callback invoked by {@link #onClosed()}.</p>
-     */
-    protected void onClosedHook()
-    {
     }
 
     /**
@@ -100,11 +76,11 @@ public abstract class ClosableConnection implements Connection
      */
     public final void close(ChannelStreamType type)
     {
-        doClose();
+        doClose(type);
         getCoordinator().close(type);
     }
 
-    void doClose()
+    void doClose(ChannelStreamType type)
     {
     }
 
@@ -117,6 +93,10 @@ public abstract class ClosableConnection implements Connection
     {
         doClose();
         getCoordinator().close();
+    }
+
+    void doClose()
+    {
     }
 
     /**
