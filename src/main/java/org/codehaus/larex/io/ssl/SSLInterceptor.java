@@ -36,31 +36,35 @@ public class SSLInterceptor extends Interceptor.Forwarder
 {
     private final ByteBuffers sslByteBuffers;
     private final SSLEngine sslEngine;
+    private final Coordinator coordinator;
     private final SSLFlusher flusher;
     private volatile boolean handshaking = true;
+    private volatile ByteBuffer sslBuffer;
 
     public SSLInterceptor(ByteBuffers sslByteBuffers, SSLEngine sslEngine, Coordinator coordinator)
     {
         this.sslByteBuffers = sslByteBuffers;
         this.sslEngine = sslEngine;
+        this.coordinator = coordinator;
         this.flusher = new SSLFlusher(coordinator);
     }
 
     @Override
     public void onReady()
     {
-        ByteBuffer sslBuffer = sslByteBuffers.acquire(sslEngine.getSession().getPacketBufferSize(), false);
         try
         {
+            // Signal to the SSL engine that we're starting the handshake
             sslEngine.beginHandshake();
             SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
             out: while (handshakeStatus != SSLEngineResult.HandshakeStatus.FINISHED)
             {
+                logger.debug("Handshake status: {}", handshakeStatus);
                 switch (handshakeStatus)
                 {
                     case NEED_WRAP:
                     {
-                        handshakeWrap(sslBuffer);
+                        handshakeWrap();
                         break;
                     }
                     case NEED_TASK:
@@ -69,7 +73,10 @@ public class SSLInterceptor extends Interceptor.Forwarder
                         break;
                     }
                     case NEED_UNWRAP:
+                    {
+                        // We are done with sending, break out to read
                         break out;
+                    }
                     default:
                         throw new IllegalStateException();
                 }
@@ -80,10 +87,6 @@ public class SSLInterceptor extends Interceptor.Forwarder
         {
             close();
             throw new RuntimeIOException(x);
-        }
-        finally
-        {
-            sslByteBuffers.release(sslBuffer);
         }
     }
 
@@ -97,12 +100,15 @@ public class SSLInterceptor extends Interceptor.Forwarder
     @Override
     public void onRead(ByteBuffer sslBuffer)
     {
-        ByteBuffer buffer = sslByteBuffers.acquire(sslEngine.getSession().getApplicationBufferSize(), false);
+        logger.debug("Reading {}", sslBuffer);
+        int bufferSize = sslEngine.getSession().getApplicationBufferSize();
+        ByteBuffer buffer = sslByteBuffers.acquire(bufferSize, false);
         try
         {
             out: while (handshaking)
             {
                 SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
+                logger.debug("Handshake status: {}", handshakeStatus);
                 switch (handshakeStatus)
                 {
                     case NEED_UNWRAP:
@@ -118,7 +124,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     }
                     case NEED_WRAP:
                     {
-                        handshakeWrap(sslBuffer);
+                        handshakeWrap();
                         break out;
                     }
                     case NOT_HANDSHAKING:
@@ -135,26 +141,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
             if (!handshaking)
             {
-                out: while (sslBuffer.hasRemaining())
-                {
-                    SSLEngineResult result = sslEngine.unwrap(sslBuffer, buffer);
-                    logger.debug("Unwrapping result: {}", result);
-                    switch (result.getStatus())
-                    {
-                        case OK:
-                        {
-                            buffer.flip();
-                            super.onRead(buffer);
-                            buffer.clear();
-                            break;
-                        }
-                        case CLOSED:
-                        {
-                            handshakeWrap(sslBuffer);
-                            break out;
-                        }
-                    }
-                }
+                wrap(sslBuffer, buffer);
             }
         }
         catch (SSLException x)
@@ -166,6 +153,107 @@ public class SSLInterceptor extends Interceptor.Forwarder
         {
             sslByteBuffers.release(buffer);
         }
+    }
+
+    private void wrap(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
+    {
+        int bufferSize = sslEngine.getSession().getApplicationBufferSize();
+        out: while (sslBuffer.hasRemaining())
+        {
+            ByteBuffer source = fillLocal(sslBuffer);
+
+            logger.debug("Wrapping from {} to {}", source, buffer);
+            SSLEngineResult result = sslEngine.unwrap(source, buffer);
+            logger.debug("Wrapped from {} to {}", source, buffer);
+            logger.debug("Wrap result: {}", result);
+            switch (result.getStatus())
+            {
+                case OK:
+                {
+                    // Prepare for read
+                    buffer.flip();
+                    // Forward the call with the unencrypted bytes
+                    super.onRead(buffer);
+                    // Cleanup the buffer
+                    buffer.clear();
+                    buffer.limit(bufferSize);
+                    // Cleanup the SSL buffer
+                    resetLocal();
+                    break;
+                }
+                case BUFFER_UNDERFLOW:
+                {
+                    prepareLocal(sslBuffer);
+                    break out;
+                }
+                case CLOSED:
+                {
+                    handshakeWrap();
+                    break out;
+                }
+                default:
+                    throw new IllegalStateException();
+            }
+        }
+    }
+
+    private void prepareLocal(ByteBuffer sslBuffer)
+    {
+        // Not enough data was read, need to copy and store what was read
+        int sslBufferSize = sslEngine.getSession().getPacketBufferSize();
+        ByteBuffer local = this.sslBuffer;
+        if (local == null)
+        {
+            local = sslByteBuffers.acquire(sslBufferSize, false);
+            local.put(sslBuffer);
+            this.sslBuffer = local;
+            logger.debug("Acquired local SSL buffer {}", local);
+        }
+        else
+        {
+            local.position(local.limit());
+            local.limit(sslBufferSize);
+        }
+    }
+
+    private void resetLocal()
+    {
+        ByteBuffer local = this.sslBuffer;
+        if (local != null)
+        {
+            if (local.hasRemaining())
+            {
+                local.compact();
+                local.limit(sslEngine.getSession().getPacketBufferSize());
+                logger.debug("Compacted local SSL buffer {}", local);
+            }
+            else
+            {
+                logger.debug("Releasing local SSL buffer {}", local);
+                sslByteBuffers.release(local);
+                this.sslBuffer = null;
+            }
+        }
+    }
+
+    private ByteBuffer fillLocal(ByteBuffer sslBuffer)
+    {
+        // If we have a previous unfinished read, coalesce it
+        ByteBuffer result = sslBuffer;
+        ByteBuffer local = this.sslBuffer;
+        if (local != null)
+        {
+            // Transfer all possible bytes from sslBuffer to this.sslBuffer without overflowing
+            int remaining = Math.min(local.remaining(), sslBuffer.remaining());
+            int limit = sslBuffer.limit();
+            sslBuffer.limit(sslBuffer.position() + remaining);
+            local.put(sslBuffer);
+            sslBuffer.limit(limit);
+
+            local.flip();
+            result = local;
+        }
+        return result;
     }
 
     @Override
@@ -189,7 +277,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 {
                     case NEED_WRAP:
                     {
-                        handshakeWrap(sslBuffer);
+                        handshakeWrap();
                         break;
                     }
                     case NEED_UNWRAP:
@@ -216,11 +304,13 @@ public class SSLInterceptor extends Interceptor.Forwarder
     @Override
     public int write(ByteBuffer buffer)
     {
-        ByteBuffer sslBuffer = sslByteBuffers.acquire(sslEngine.getSession().getPacketBufferSize(), false);
+        int sslBufferSize = sslEngine.getSession().getPacketBufferSize();
+        ByteBuffer sslBuffer = sslByteBuffers.acquire(sslBufferSize, false);
         try
         {
             SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
             logger.debug("Wrapping result: {}", result);
+            assert result.getStatus() == SSLEngineResult.Status.OK;
             sslBuffer.flip();
             int length = sslBuffer.remaining();
             flush(sslBuffer);
@@ -239,39 +329,74 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
     private boolean handshakeUnwrap(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
     {
-        while (sslBuffer.hasRemaining())
+        logger.debug("Handshake reading from {}", sslBuffer);
+
+        // If we have a previous unfinished read, coalesce it
+        ByteBuffer source = fillLocal(sslBuffer);
+
+        while (source.hasRemaining())
         {
-            SSLEngineResult result = sslEngine.unwrap(sslBuffer, buffer);
-            logger.debug("Handshake unwrapping result: {}", result);
-            assert result.getStatus() == SSLEngineResult.Status.OK;
+            logger.debug("Handshake unwrapping from {} to {}", source, buffer);
+            SSLEngineResult result = sslEngine.unwrap(source, buffer);
+            logger.debug("Handshake unwrapped from {} to {}", source, buffer);
+            logger.debug("Handshake unwrap result: {}", result);
+            switch (result.getStatus())
+            {
+                case OK:
+                {
+                    // Everything is unwrapped, we're done
+                    resetLocal();
+                    break;
+                }
+                case BUFFER_UNDERFLOW:
+                {
+                    prepareLocal(sslBuffer);
+                    break;
+                }
+                // TODO: handle CLOSED ?
+                default:
+                    throw new IllegalStateException();
+            }
             if (result.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_UNWRAP)
                 return false;
         }
         return true;
     }
 
-    private void handshakeWrap(ByteBuffer sslBuffer) throws SSLException
+    private void handshakeWrap() throws SSLException
     {
-        // During handshake wrapping there is nothing to send
-        ByteBuffer buffer = ByteBuffer.allocate(0);
-        while (true)
+        int sslBufferSize = sslEngine.getSession().getPacketBufferSize();
+        ByteBuffer sslBuffer = sslByteBuffers.acquire(sslBufferSize, false);
+        try
         {
-            sslBuffer.clear();
-            SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
-            logger.debug("Handshake wrapping result: {}", result);
-            assert result.getStatus() == SSLEngineResult.Status.OK || result.getStatus() == SSLEngineResult.Status.CLOSED;
-            sslBuffer.flip();
-            try
+            // During handshake wrapping there is nothing to send
+            ByteBuffer buffer = ByteBuffer.allocate(0);
+            while (true)
             {
-                flush(sslBuffer);
+                sslBuffer.clear();
+                sslBuffer.limit(sslBufferSize);
+                logger.debug("Handshake wrapping to {}", sslBuffer);
+                SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
+                logger.debug("Handshake wrapped to {}", sslBuffer);
+                logger.debug("Handshake wrap result: {}", result);
+                assert result.getStatus() == SSLEngineResult.Status.OK || result.getStatus() == SSLEngineResult.Status.CLOSED;
+                sslBuffer.flip();
+                try
+                {
+                    flush(sslBuffer);
+                }
+                catch (RuntimeSocketClosedException x)
+                {
+                    if (result.getStatus() != SSLEngineResult.Status.CLOSED)
+                        throw x;
+                }
+                if (result.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_WRAP)
+                    break;
             }
-            catch (RuntimeSocketClosedException x)
-            {
-                if (result.getStatus() != SSLEngineResult.Status.CLOSED)
-                    throw x;
-            }
-            if (result.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_WRAP)
-                break;
+        }
+        finally
+        {
+            sslByteBuffers.release(sslBuffer);
         }
     }
 

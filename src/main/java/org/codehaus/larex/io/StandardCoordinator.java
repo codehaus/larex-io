@@ -206,7 +206,8 @@ public class StandardCoordinator implements Coordinator
     {
         int read;
         boolean closed;
-        ByteBuffer buffer = getByteBuffers().acquire(getReadBufferSize(), false);
+        int readBufferSize = getReadBufferSize();
+        ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, false);
         try
         {
             // The buffer can be smaller than the data available, so read until we cannot read anymore.
@@ -223,6 +224,7 @@ public class StandardCoordinator implements Coordinator
                     buffer.flip();
                     onRead(buffer);
                     buffer.clear();
+                    buffer.limit(readBufferSize);
                 }
 
                 if (read == 0 || closed)

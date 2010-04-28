@@ -54,7 +54,6 @@ public class SSLEndpoint<T extends Connection> extends StandardEndpoint<T>
         sslEngine = sslContext.createSSLEngine(host, port);
         sslEngine.setUseClientMode(true);
         coordinator.addInterceptor(new SSLInterceptor(sslByteBuffers, sslEngine, coordinator));
-        coordinator.setReadBufferSize(sslEngine.getSession().getPacketBufferSize());
         return super.newConnection(coordinator);
     }
 
