@@ -22,7 +22,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.codehaus.larex.io.connector.StandardServerConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 
 /**
  * @version $Revision: 13 $ $Date$
@@ -41,7 +41,7 @@ public class EchoServerMain
 
         Scheduler scheduler = new StandardScheduler();
 
-        StandardServerConnector connector = new StandardServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler);
+        ServerConnector connector = new ServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler);
         connector.listen();
     }
 }

@@ -22,8 +22,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.codehaus.larex.io.connector.StandardClientConnector;
-import org.codehaus.larex.io.connector.StandardServerConnector;
+import org.codehaus.larex.io.connector.ClientConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -55,13 +55,13 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
             }
         };
 
-        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
         int port = serverConnector.listen();
 
         final AtomicInteger tester = new AtomicInteger();
         final AtomicInteger failure = new AtomicInteger();
         final CountDownLatch latch = new CountDownLatch(1);
-        StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
+        ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
         StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
         {
             public StandardConnection newConnection(Coordinator coordinator)

@@ -23,10 +23,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.codehaus.larex.io.connector.ClientConnector;
 import org.codehaus.larex.io.connector.Endpoint;
-import org.codehaus.larex.io.connector.StandardClientConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.codehaus.larex.io.connector.StandardEndpoint;
-import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -57,9 +57,9 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                 };
             }
         };
-        StandardServerConnector serverConnector = new StandardServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
         int port = serverConnector.listen();
-        StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler())
+        ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
         {
             @Override
             protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)

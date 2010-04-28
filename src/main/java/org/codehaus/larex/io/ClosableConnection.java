@@ -74,13 +74,13 @@ public abstract class ClosableConnection extends AbstractConnection
      *
      * @param type the stream type to close
      */
-    public final void close(ChannelStreamType type)
+    public final void close(StreamType type)
     {
         doClose(type);
         getCoordinator().close(type);
     }
 
-    void doClose(ChannelStreamType type)
+    void doClose(StreamType type)
     {
     }
 
@@ -114,7 +114,7 @@ public abstract class ClosableConnection extends AbstractConnection
     {
         CountDownLatch softClose = new CountDownLatch(1);
         this.softClose = softClose;
-        close(ChannelStreamType.OUTPUT);
+        close(StreamType.OUTPUT);
         boolean result = softClose.await(timeout, TimeUnit.MILLISECONDS);
         this.softClose = null;
         if (!result)

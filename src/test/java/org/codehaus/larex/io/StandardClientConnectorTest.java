@@ -23,9 +23,9 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.codehaus.larex.io.connector.ClientConnector;
 import org.codehaus.larex.io.connector.Endpoint;
-import org.codehaus.larex.io.connector.StandardClientConnector;
-import org.codehaus.larex.io.connector.StandardServerConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -41,7 +41,7 @@ public class StandardClientConnectorTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch acceptLatch = new CountDownLatch(1);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
             protected void accepted(SocketChannel socketChannel) throws IOException
@@ -55,7 +55,7 @@ public class StandardClientConnectorTest extends AbstractTestCase
         try
         {
             final CountDownLatch responseLatch = new CountDownLatch(1);
-            StandardClientConnector clientConnector = new StandardClientConnector(getThreadPool(), getScheduler());
+            ClientConnector clientConnector = new ClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)

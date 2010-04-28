@@ -23,7 +23,7 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.codehaus.larex.io.connector.StandardServerConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -39,7 +39,7 @@ public class ServerAcceptsTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch latch = new CountDownLatch(1);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, null, getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, null, getThreadPool(), getScheduler())
         {
             @Override
             protected void accepted(SocketChannel socketChannel) throws IOException

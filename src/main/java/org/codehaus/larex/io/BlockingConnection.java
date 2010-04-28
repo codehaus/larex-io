@@ -57,6 +57,9 @@ public abstract class BlockingConnection extends FlushableConnection
      */
     public final void onRead(ByteBuffer buffer)
     {
+        // TODO: fix this: if this.buffer is small we copy, notify,
+        // TODO: but this method is called again because there is more data to read
+        // TODO: need to wait until it's processed, or buffer it somewhere
         synchronized (this)
         {
             this.buffer.put(buffer);
@@ -140,10 +143,10 @@ public abstract class BlockingConnection extends FlushableConnection
     }
 
     @Override
-    void doClose(ChannelStreamType type)
+    void doClose(StreamType type)
     {
         super.doClose(type);
-        if (type == ChannelStreamType.INPUT)
+        if (type == StreamType.INPUT)
         {
             synchronized (this)
             {

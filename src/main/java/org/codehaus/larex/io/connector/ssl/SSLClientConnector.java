@@ -35,12 +35,12 @@ import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
-import org.codehaus.larex.io.connector.StandardClientConnector;
+import org.codehaus.larex.io.connector.ClientConnector;
 
 /**
  * @version $Revision$ $Date$
  */
-public class SSLClientConnector extends StandardClientConnector
+public class SSLClientConnector extends ClientConnector
 {
     private final ByteBuffers sslByteBuffers;
     private volatile String protocolAlgorithm = "SSLv3";

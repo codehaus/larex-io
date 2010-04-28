@@ -65,10 +65,10 @@ public abstract class FlushableConnection extends ClosableConnection
     }
 
     @Override
-    void doClose(ChannelStreamType type)
+    void doClose(StreamType type)
     {
         super.doClose(type);
-        if (type == ChannelStreamType.OUTPUT)
+        if (type == StreamType.OUTPUT)
             flusher.closeEvent();
     }
 

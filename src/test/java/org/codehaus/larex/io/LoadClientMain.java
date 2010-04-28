@@ -33,7 +33,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.codehaus.larex.io.connector.StandardClientConnector;
+import org.codehaus.larex.io.connector.ClientConnector;
 
 /**
  * @version $Revision: 13 $ $Date$
@@ -62,7 +62,7 @@ public class LoadClientMain
                 new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
         Scheduler scheduler = new StandardScheduler();
 
-        StandardClientConnector connector = new StandardClientConnector(threadPool, scheduler);
+        ClientConnector connector = new ClientConnector(threadPool, scheduler);
 
         Random random = new Random();
 

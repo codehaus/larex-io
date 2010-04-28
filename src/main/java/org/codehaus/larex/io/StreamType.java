@@ -21,7 +21,7 @@ package org.codehaus.larex.io;
  *
  * @version $Revision$ $Date$
  */
-public enum ChannelStreamType
+public enum StreamType
 {
     /**
      * <p>The input stream of a channel.</p>

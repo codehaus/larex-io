@@ -48,7 +48,7 @@ public interface Interceptor
 
     void onClosed();
 
-    void close(ChannelStreamType type);
+    void close(StreamType type);
 
     void close();
 
@@ -112,7 +112,7 @@ public interface Interceptor
             getNext().onClosed();
         }
 
-        public void close(ChannelStreamType type)
+        public void close(StreamType type)
         {
             getNext().close(type);
         }

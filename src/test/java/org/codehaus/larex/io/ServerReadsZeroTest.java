@@ -25,9 +25,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.codehaus.larex.io.connector.ClientConnector;
 import org.codehaus.larex.io.connector.Endpoint;
-import org.codehaus.larex.io.connector.StandardClientConnector;
-import org.codehaus.larex.io.connector.StandardServerConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -43,7 +43,7 @@ public class ServerReadsZeroTest extends AbstractTestCase
         final CountDownLatch needReads = new CountDownLatch(5);
         final CountDownLatch reads = new CountDownLatch(1);
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
             protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
@@ -93,7 +93,7 @@ public class ServerReadsZeroTest extends AbstractTestCase
 
         try
         {
-            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler());
+            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
             StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
             assertTrue(connection.awaitReady(1000));

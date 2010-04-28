@@ -174,7 +174,7 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    public void close(ChannelStreamType type)
+    public void close(StreamType type)
     {
         getInterceptor().close(type);
     }
@@ -239,7 +239,7 @@ public class StandardCoordinator implements Coordinator
         if (closed)
         {
             // TODO: improve this: the if may not be needed
-            if (!getChannel().isClosed(ChannelStreamType.INPUT))
+            if (!getChannel().isClosed(StreamType.INPUT))
             {
                 if (logger.isDebugEnabled())
                     logger.debug("Channel {} closed remotely", getChannel());
@@ -438,7 +438,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
-        public void close(ChannelStreamType type)
+        public void close(StreamType type)
         {
             getChannel().close(type);
         }

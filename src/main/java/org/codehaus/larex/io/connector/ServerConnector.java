@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @version $Revision: 903 $ $Date$
  */
-public class StandardServerConnector
+public class ServerConnector
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final InetSocketAddress address;
@@ -60,12 +60,12 @@ public class StandardServerConnector
     private volatile Thread acceptorThread;
     private volatile ServerSocketChannel serverChannel;
 
-    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
+    public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
     {
         this(address, connectionFactory, threadPool, scheduler, 1);
     }
 
-    public StandardServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler, int selectors)
+    public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler, int selectors)
     {
         this.address = address;
         this.connectionFactory = connectionFactory;

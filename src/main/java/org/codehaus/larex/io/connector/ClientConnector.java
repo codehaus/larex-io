@@ -30,7 +30,7 @@ import org.codehaus.larex.io.ThreadLocalByteBuffers;
 /**
  * @version $Revision$ $Date$
  */
-public class StandardClientConnector
+public class ClientConnector
 {
     private final Executor threadPool;
     private final Scheduler scheduler;
@@ -38,12 +38,12 @@ public class StandardClientConnector
     private final Selector[] selectors;
     private final AtomicInteger selector = new AtomicInteger();
 
-    public StandardClientConnector(Executor threadPool, Scheduler scheduler)
+    public ClientConnector(Executor threadPool, Scheduler scheduler)
     {
         this(threadPool, scheduler, 1);
     }
 
-    public StandardClientConnector(Executor threadPool, Scheduler scheduler, int selectors)
+    public ClientConnector(Executor threadPool, Scheduler scheduler, int selectors)
     {
         this.threadPool = threadPool;
         this.scheduler = scheduler;

@@ -162,7 +162,7 @@ public class StandardChannel implements Channel
         return result;
     }
 
-    public boolean isClosed(ChannelStreamType type)
+    public boolean isClosed(StreamType type)
     {
         switch (type)
         {
@@ -175,7 +175,7 @@ public class StandardChannel implements Channel
         }
     }
 
-    public void close(ChannelStreamType type)
+    public void close(StreamType type)
     {
         if (isClosed() || isClosed(type))
             return;

@@ -22,12 +22,12 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 
 import org.codehaus.larex.io.ByteBuffers;
-import org.codehaus.larex.io.ChannelStreamType;
 import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.Flusher;
 import org.codehaus.larex.io.Interceptor;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
+import org.codehaus.larex.io.StreamType;
 
 /**
  * @version $Revision$ $Date$
@@ -257,7 +257,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public void close(ChannelStreamType type)
+    public void close(StreamType type)
     {
         // TODO
         super.close(type);

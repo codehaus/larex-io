@@ -84,9 +84,9 @@ public interface Coordinator extends Selector.Listener
      * <p>Closes the given stream type of the channel associated with this coordinator.</p>
      *
      * @param type the stream type to close
-     * @see Channel#close(ChannelStreamType)
+     * @see Channel#close(StreamType)
      */
-    public void close(ChannelStreamType type);
+    public void close(StreamType type);
 
     /**
      * <p>Closes the channel associated with this coordinator.</p>

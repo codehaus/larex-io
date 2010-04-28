@@ -21,10 +21,10 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.codehaus.larex.io.connector.ClientConnector;
 import org.codehaus.larex.io.connector.Endpoint;
-import org.codehaus.larex.io.connector.StandardClientConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
 import org.codehaus.larex.io.connector.StandardEndpoint;
-import org.codehaus.larex.io.connector.StandardServerConnector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
@@ -39,11 +39,11 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
     public void testWriteTimeout() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        StandardServerConnector serverConnector = new StandardServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler());
         int port = serverConnector.listen();
         try
         {
-            StandardClientConnector connector = new StandardClientConnector(getThreadPool(), getScheduler())
+            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
                 protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
