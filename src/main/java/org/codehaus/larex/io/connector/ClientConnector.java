@@ -65,22 +65,37 @@ public class ClientConnector
         return new ReadWriteSelector();
     }
 
+    protected Executor getThreadPool()
+    {
+        return threadPool;
+    }
+
+    protected Scheduler getScheduler()
+    {
+        return scheduler;
+    }
+
+    protected ByteBuffers getByteBuffers()
+    {
+        return byteBuffers;
+    }
+
+    protected Selector[] getSelectors()
+    {
+        return selectors;
+    }
+
     public <C extends Connection> Endpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
     {
-        Selector selector = chooseSelector(selectors);
-        return newEndpoint(selector, connectionFactory, byteBuffers, threadPool, scheduler);
+        return new StandardEndpoint<C>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler());
     }
 
-    protected Selector chooseSelector(Selector[] selectors)
+    protected Selector chooseSelector()
     {
         int index = selector.incrementAndGet();
+        Selector[] selectors = getSelectors();
         index = Math.abs(index % selectors.length);
         return selectors[index];
-    }
-
-    protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
-    {
-        return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler);
     }
 
     public void close()

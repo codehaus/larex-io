@@ -89,6 +89,26 @@ public class ServerConnector
         return new ReadWriteSelector();
     }
 
+    public Executor getThreadPool()
+    {
+        return threadPool;
+    }
+
+    public Scheduler getScheduler()
+    {
+        return scheduler;
+    }
+
+    protected ByteBuffers getByteBuffers()
+    {
+        return byteBuffers;
+    }
+
+    public Selector[] getSelectors()
+    {
+        return selectors;
+    }
+
     public Boolean isReuseAddress()
     {
         return reuseAddress;
@@ -179,34 +199,39 @@ public class ServerConnector
     {
         socketChannel.configureBlocking(false);
 
-        Selector selector = chooseSelector(selectors);
-
-        Coordinator coordinator = newCoordinator(selector, byteBuffers, threadPool, scheduler);
+        Selector selector = chooseSelector();
+        Coordinator coordinator = newCoordinator(selector);
 
         Channel channel = newChannel(socketChannel, coordinator);
         coordinator.setChannel(channel);
 
-        Connection connection = connectionFactory.newConnection(coordinator);
+        Connection connection = newConnection(socketChannel, coordinator);
         coordinator.setConnection(connection);
 
         register(selector, channel, coordinator);
     }
 
-    protected Selector chooseSelector(Selector[] selectors)
+    protected Selector chooseSelector()
     {
         int index = selector.incrementAndGet();
+        Selector[] selectors = getSelectors();
         index = Math.abs(index % selectors.length);
         return selectors[index];
     }
 
-    protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+    protected Coordinator newCoordinator(Selector selector)
     {
-        return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout());
     }
 
     protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
     {
         return new StandardChannel(channel, coordinator);
+    }
+
+    protected Connection newConnection(SocketChannel socketChannel, Coordinator coordinator)
+    {
+        return connectionFactory.newConnection(coordinator);
     }
 
     protected void register(Selector selector, Channel channel, Coordinator coordinator)

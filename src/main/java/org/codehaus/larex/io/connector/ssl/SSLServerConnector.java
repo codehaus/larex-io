@@ -19,12 +19,15 @@ package org.codehaus.larex.io.connector.ssl;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.nio.channels.SocketChannel;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.concurrent.Executor;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -32,14 +35,16 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.CachedByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.Scheduler;
-import org.codehaus.larex.io.connector.ClientConnector;
+import org.codehaus.larex.io.connector.ServerConnector;
+import org.codehaus.larex.io.ssl.SSLInterceptor;
 
 /**
  * @version $Revision$ $Date$
  */
-public class SSLClientConnector extends ClientConnector
+public class SSLServerConnector extends ServerConnector
 {
     private final ByteBuffers sslByteBuffers;
     private volatile String protocolAlgorithm = "SSLv3";
@@ -55,14 +60,14 @@ public class SSLClientConnector extends ClientConnector
     private volatile String secureRandomAlgorithm = "SHA1PRNG";
     private volatile SSLContext sslContext;
 
-    public SSLClientConnector(Executor threadPool, Scheduler scheduler)
+    public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
     {
-        this(threadPool, scheduler, 1);
+        this(address, connectionFactory, threadPool, scheduler, 1);
     }
 
-    public SSLClientConnector(Executor threadPool, Scheduler scheduler, int selectors)
+    public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler, int selectors)
     {
-        super(threadPool, scheduler, selectors);
+        super(address, connectionFactory, threadPool, scheduler, selectors);
         this.sslByteBuffers = newSSLByteBuffers();
     }
 
@@ -76,9 +81,15 @@ public class SSLClientConnector extends ClientConnector
         return sslByteBuffers;
     }
 
-    public <C extends Connection> SSLEndpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
+    @Override
+    protected Connection newConnection(SocketChannel socketChannel, Coordinator coordinator)
     {
-        return new SSLEndpoint<C>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getSSLContext(), getSSLByteBuffers());
+        String host = socketChannel.socket().getInetAddress().getHostAddress();
+        int port = socketChannel.socket().getPort();
+        SSLEngine sslEngine = sslContext.createSSLEngine(host, port);
+        sslEngine.setUseClientMode(false);
+        coordinator.addInterceptor(new SSLInterceptor(getSSLByteBuffers(), sslEngine, coordinator));
+        return super.newConnection(socketChannel, coordinator);
     }
 
     public String getProtocolAlgorithm()

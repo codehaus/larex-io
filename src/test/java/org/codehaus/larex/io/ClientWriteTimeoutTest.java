@@ -18,7 +18,6 @@ package org.codehaus.larex.io;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.connector.ClientConnector;
@@ -46,9 +45,9 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
             ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
-                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+                public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
                 {
-                    return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
+                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler())
                     {
                         @Override
                         protected Coordinator newCoordinator()

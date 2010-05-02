@@ -19,7 +19,6 @@ package org.codehaus.larex.io;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -110,9 +109,9 @@ public class ClientClosesTest extends AbstractTestCase
         }, getThreadPool(), getScheduler())
         {
             @Override
-            protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+            protected Coordinator newCoordinator(Selector selector)
             {
-                return new TimeoutCoordinator(selector, byteBuffers, threadPool, scheduler, getReadTimeout(), getWriteTimeout())
+                return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout())
                 {
                     @Override
                     protected void read()
@@ -144,9 +143,9 @@ public class ClientClosesTest extends AbstractTestCase
             ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
-                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+                public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
                 {
-                    return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
+                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler())
                     {
                         @Override
                         protected Coordinator newCoordinator()
@@ -261,9 +260,9 @@ public class ClientClosesTest extends AbstractTestCase
             ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
             {
                 @Override
-                protected <T extends Connection> Endpoint<T> newEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+                public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
                 {
-                    return new StandardEndpoint<T>(selector, connectionFactory, byteBuffers, threadPool, scheduler)
+                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler())
                     {
                         @Override
                         protected Coordinator newCoordinator()

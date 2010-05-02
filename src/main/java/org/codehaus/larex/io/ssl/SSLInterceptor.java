@@ -338,8 +338,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         {
             logger.debug("Handshake unwrapping from {} to {}", source, buffer);
             SSLEngineResult result = sslEngine.unwrap(source, buffer);
-            logger.debug("Handshake unwrapped from {} to {}", source, buffer);
-            logger.debug("Handshake unwrap result: {}", result);
+            logger.debug("Handshake unwrapped from {} to {}, result {}", new Object[]{source, buffer, result});
             switch (result.getStatus())
             {
                 case OK:
@@ -353,7 +352,11 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     prepareLocal(sslBuffer);
                     break;
                 }
-                // TODO: handle CLOSED ?
+                case CLOSED:
+                {
+                    // We have unwrapped a close SSL message, just break 
+                    break;
+                }
                 default:
                     throw new IllegalStateException();
             }
@@ -377,8 +380,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 sslBuffer.limit(sslBufferSize);
                 logger.debug("Handshake wrapping to {}", sslBuffer);
                 SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
-                logger.debug("Handshake wrapped to {}", sslBuffer);
-                logger.debug("Handshake wrap result: {}", result);
+                logger.debug("Handshake wrapped to {}, result {}", sslBuffer, result);
                 assert result.getStatus() == SSLEngineResult.Status.OK || result.getStatus() == SSLEngineResult.Status.CLOSED;
                 sslBuffer.flip();
                 try

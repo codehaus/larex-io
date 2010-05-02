@@ -50,29 +50,29 @@ import static org.junit.Assert.assertTrue;
  */
 public class SSLClientConnectorTest extends AbstractTestCase
 {
-    private SSLClientConnector connector;
+    private SSLClientConnector clientConnector;
 
     @Before
-    public void initConnector() throws Exception
+    public void initClientConnector() throws Exception
     {
-        connector = new SSLClientConnector(getThreadPool(), getScheduler());
-        connector.setKeyStoreResource("keystore");
-        connector.setKeyStorePassword("storepwd");
-        connector.setKeyPassword("keypwd");
-        connector.setTrustStoreResource("truststore");
+        clientConnector = new SSLClientConnector(getThreadPool(), getScheduler());
+        clientConnector.setKeyStoreResource("keystore");
+        clientConnector.setKeyStorePassword("storepwd");
+        clientConnector.setKeyPassword("keypwd");
+        clientConnector.setTrustStoreResource("truststore");
     }
 
     @After
-    public void destroyConnector() throws Exception
+    public void destroyClientConnector() throws Exception
     {
-        connector.close();
-        connector.join(1000);
+        clientConnector.close();
+        clientConnector.join(1000);
     }
 
     @Test
     public void testHandshake() throws Exception
     {
-        SSLContext sslContext = connector.getSSLContext();
+        SSLContext sslContext = clientConnector.getSSLContext();
         final CountDownLatch handshakeLatch = new CountDownLatch(1);
         final SSLServerSocket sslServerSocket = (SSLServerSocket)sslContext.getServerSocketFactory().createServerSocket(0);
         Thread acceptor = new Thread()
@@ -96,7 +96,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
         acceptor.start();
         try
         {
-            SSLEndpoint<StandardConnection> sslEndpoint = connector.newEndpoint(new StandardConnection.Factory());
+            SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new StandardConnection.Factory());
             StandardConnection connection = sslEndpoint.connect(new InetSocketAddress("localhost", sslServerSocket.getLocalPort()));
             SSLEngine sslEngine = sslEndpoint.getSSLEngine();
             assertNotNull(sslEngine);
@@ -115,7 +115,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
     @Test
     public void testHandshakeThenServerCloses() throws Exception
     {
-        SSLContext sslContext = connector.getSSLContext();
+        SSLContext sslContext = clientConnector.getSSLContext();
         final CountDownLatch serverLatch = new CountDownLatch(1);
         final SSLServerSocket sslServerSocket = (SSLServerSocket)sslContext.getServerSocketFactory().createServerSocket(0);
         Thread acceptor = new Thread()
@@ -143,7 +143,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
             final CountDownLatch remoteCloseLatch = new CountDownLatch(1);
             final CountDownLatch closingLatch = new CountDownLatch(1);
             final CountDownLatch closedLatch = new CountDownLatch(1);
-            SSLEndpoint<StandardConnection> sslEndpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)
                 {
@@ -189,7 +189,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
     @Test
     public void testHandshakeThenServerWritesThenCloses() throws Exception
     {
-        SSLContext sslContext = connector.getSSLContext();
+        SSLContext sslContext = clientConnector.getSSLContext();
         final String serverMessage = "FROM_SERVER";
         final CountDownLatch serverLatch = new CountDownLatch(1);
         final SSLServerSocket sslServerSocket = (SSLServerSocket)sslContext.getServerSocketFactory().createServerSocket(0);
@@ -221,7 +221,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
             final CountDownLatch remoteCloseLatch = new CountDownLatch(1);
             final CountDownLatch closingLatch = new CountDownLatch(1);
             final CountDownLatch closedLatch = new CountDownLatch(1);
-            SSLEndpoint<StandardConnection> sslEndpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)
                 {
@@ -275,7 +275,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
     @Test
     public void testHandshakeThenClientWritesThenClientCloses() throws Exception
     {
-        SSLContext sslContext = connector.getSSLContext();
+        SSLContext sslContext = clientConnector.getSSLContext();
         final String clientMessage = "FROM_CLIENT";
         final CountDownLatch serverLatch = new CountDownLatch(1);
         final CountDownLatch serverCloseLatch = new CountDownLatch(1);
@@ -312,7 +312,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
         acceptor.start();
         try
         {
-            SSLEndpoint<StandardConnection> sslEndpoint = connector.newEndpoint(new StandardConnection.Factory());
+            SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new StandardConnection.Factory());
             StandardConnection connection = sslEndpoint.connect(new InetSocketAddress("localhost", sslServerSocket.getLocalPort()));
             SSLEngine sslEngine = sslEndpoint.getSSLEngine();
             assertNotNull(sslEngine);
@@ -335,7 +335,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
     @Test
     public void testHandshakeThenClientWritesBigBodyThenServerEchoesBack() throws Exception
     {
-        SSLContext sslContext = connector.getSSLContext();
+        SSLContext sslContext = clientConnector.getSSLContext();
 
         String chunk = "0123456789ABCDEF";
         final StringBuilder content = new StringBuilder();
@@ -390,7 +390,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
         {
             final AtomicInteger bytesCount = new AtomicInteger();
             final CountDownLatch clientLatch = new CountDownLatch(1);
-            SSLEndpoint<StandardConnection> sslEndpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
                 public StandardConnection newConnection(Coordinator coordinator)
                 {

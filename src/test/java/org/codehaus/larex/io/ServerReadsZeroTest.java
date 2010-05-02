@@ -21,7 +21,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -69,9 +68,9 @@ public class ServerReadsZeroTest extends AbstractTestCase
             }
 
             @Override
-            protected Coordinator newCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+            protected Coordinator newCoordinator(Selector selector)
             {
-                return new StandardCoordinator(selector, byteBuffers, threadPool)
+                return new StandardCoordinator(selector, getByteBuffers(), getThreadPool())
                 {
                     @Override
                     protected void onRead(ByteBuffer buffer)

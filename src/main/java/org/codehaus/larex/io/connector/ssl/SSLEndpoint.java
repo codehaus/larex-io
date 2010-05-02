@@ -33,21 +33,21 @@ import org.codehaus.larex.io.ssl.SSLInterceptor;
  * TODO: handle set[Need|Want]ClientAuth (and other SSLEngine methods. maybe ?)
  * @version $Revision$ $Date$
  */
-public class SSLEndpoint<T extends Connection> extends StandardEndpoint<T>
+public class SSLEndpoint<C extends Connection> extends StandardEndpoint<C>
 {
     private final SSLContext sslContext;
     private final ByteBuffers sslByteBuffers;
     private volatile SSLEngine sslEngine;
 
-    public SSLEndpoint(Selector selector, ConnectionFactory<T> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler, SSLContext sslContext, ByteBuffers sslByteBuffers)
+    public SSLEndpoint(ConnectionFactory<C> connectionFactory, Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler, SSLContext sslContext, ByteBuffers sslByteBuffers)
     {
-        super(selector, connectionFactory, byteBuffers, threadPool, scheduler);
+        super(connectionFactory, selector, byteBuffers, threadPool, scheduler);
         this.sslContext = sslContext;
         this.sslByteBuffers = sslByteBuffers;
     }
 
     @Override
-    protected T newConnection(Coordinator coordinator)
+    protected C newConnection(Coordinator coordinator)
     {
         String host = getSocketChannel().socket().getInetAddress().getHostAddress();
         int port = getSocketChannel().socket().getPort();

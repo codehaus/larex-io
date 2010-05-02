@@ -47,19 +47,19 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final SocketChannel channel;
-    private final Selector selector;
     private final ConnectionFactory<C> connectionFactory;
+    private final Selector selector;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
     private final Scheduler scheduler;
 
-    public StandardEndpoint(Selector selector, ConnectionFactory<C> connectionFactory, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+    public StandardEndpoint(ConnectionFactory<C> connectionFactory, Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
     {
         try
         {
             this.channel = SocketChannel.open();
-            this.selector = selector;
             this.connectionFactory = connectionFactory;
+            this.selector = selector;
             this.byteBuffers = byteBuffers;
             this.threadPool = threadPool;
             this.scheduler = scheduler;
