@@ -70,7 +70,6 @@ public interface Channel
      * @param type the stream type to test for close
      * @return whether this channel is closed for the given stream type
      * @see #close(StreamType)
-     * @see #isClosed()
      */
     public boolean isClosed(StreamType type);
 
@@ -81,18 +80,4 @@ public interface Channel
      * @see #isClosed(StreamType)
      */
     public void close(StreamType type);
-
-    /**
-     * @return whether this channel is closed
-     * @see #close()
-     * @see #isClosed(StreamType)
-     */
-    public boolean isClosed();
-
-    /**
-     * <p>Closes this channel.</p>
-     *
-     * @see #isClosed()
-     */
-    public void close();
 }

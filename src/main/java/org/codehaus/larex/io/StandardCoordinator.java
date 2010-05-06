@@ -170,25 +170,23 @@ public class StandardCoordinator implements Coordinator
         }
         finally
         {
-            close();
+            close(StreamType.INPUT_OUTPUT);
         }
     }
 
     public void close(StreamType type)
     {
-        getInterceptor().close(type);
-    }
+        if (type == null)
+            throw new NullPointerException();
 
-    public void close()
-    {
-        getInterceptor().onClosing();
+        getInterceptor().onClosing(type);
         try
         {
-            getInterceptor().close();
+            getInterceptor().close(type);
         }
         finally
         {
-            getInterceptor().onClosed();
+            getInterceptor().onClosed(type);
         }
     }
 
@@ -233,7 +231,7 @@ public class StandardCoordinator implements Coordinator
 
         if (closed)
         {
-            // TODO: improve this: the if may not be needed
+            // TODO: improve this: the if statement may not be needed
             if (!getChannel().isClosed(StreamType.INPUT))
             {
                 if (logger.isDebugEnabled())
@@ -260,7 +258,7 @@ public class StandardCoordinator implements Coordinator
 
     protected void onCloseAction()
     {
-        close();
+        close(StreamType.INPUT_OUTPUT);
     }
 
     protected void onRead(ByteBuffer buffer)
@@ -431,11 +429,11 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
-        public void onClosing()
+        public void onClosing(StreamType type)
         {
             try
             {
-                getConnection().closingEvent();
+                getConnection().closingEvent(type);
             }
             catch (Exception x)
             {
@@ -443,11 +441,11 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
-        public void onClosed()
+        public void onClosed(StreamType type)
         {
             try
             {
-                getConnection().closedEvent();
+                getConnection().closedEvent(type);
             }
             catch (Exception x)
             {
@@ -458,11 +456,6 @@ public class StandardCoordinator implements Coordinator
         public void close(StreamType type)
         {
             getChannel().close(type);
-        }
-
-        public void close()
-        {
-            getChannel().close();
         }
     }
 }

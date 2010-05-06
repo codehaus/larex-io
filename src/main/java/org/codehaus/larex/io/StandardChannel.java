@@ -109,12 +109,12 @@ public class StandardChannel implements Channel
         }
         catch (ClosedChannelException x)
         {
-            controller.close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
-            controller.close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeIOException(x);
         }
     }
@@ -140,13 +140,13 @@ public class StandardChannel implements Channel
         catch (ClosedChannelException x)
         {
             logger.debug("Channel closed during write of {} bytes", buffer.remaining());
-            controller.close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
             logger.debug("Unexpected IOException", x);
-            controller.close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeIOException(x);
         }
     }
@@ -170,6 +170,8 @@ public class StandardChannel implements Channel
                 return channel.socket().isInputShutdown();
             case OUTPUT:
                 return channel.socket().isOutputShutdown();
+            case INPUT_OUTPUT:
+                return !channel.isOpen();
             default:
                 throw new IllegalStateException();
         }
@@ -177,7 +179,7 @@ public class StandardChannel implements Channel
 
     public void close(StreamType type)
     {
-        if (isClosed() || isClosed(type))
+        if (isClosed(type))
             return;
 
         if (debug)
@@ -193,6 +195,8 @@ public class StandardChannel implements Channel
                 case OUTPUT:
                     channel.socket().shutdownOutput();
                     break;
+                case INPUT_OUTPUT:
+                    close();
                 default:
                     throw new IllegalStateException();
             }
@@ -203,19 +207,8 @@ public class StandardChannel implements Channel
         }
     }
 
-    public boolean isClosed()
+    protected void close()
     {
-        return !channel.isOpen();
-    }
-
-    public void close()
-    {
-        if (isClosed())
-            return;
-
-        if (debug)
-            logger.debug("Channel {} closing", this);
-
         try
         {
             SelectionKey selectionKey = this.selectionKey;

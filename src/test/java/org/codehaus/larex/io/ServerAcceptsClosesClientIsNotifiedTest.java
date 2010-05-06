@@ -64,7 +64,7 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
             @Override
             protected void register(Selector selector, Channel channel, Selector.Listener listener)
             {
-                channel.close();
+                channel.close(StreamType.INPUT_OUTPUT);
                 super.register(selector, channel, listener);
             }
         };

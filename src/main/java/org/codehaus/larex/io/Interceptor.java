@@ -46,13 +46,11 @@ public interface Interceptor
 
     void onRemoteClose();
 
-    void onClosing();
+    void onClosing(StreamType type);
 
-    void onClosed();
+    void onClosed(StreamType type);
 
     void close(StreamType type);
-
-    void close();
 
     public static class Forwarder implements Interceptor
     {
@@ -109,24 +107,19 @@ public interface Interceptor
             getNext().onRemoteClose();
         }
 
-        public void onClosing()
+        public void onClosing(StreamType type)
         {
-            getNext().onClosing();
+            getNext().onClosing(type);
         }
 
-        public void onClosed()
+        public void onClosed(StreamType type)
         {
-            getNext().onClosed();
+            getNext().onClosed(type);
         }
 
         public void close(StreamType type)
         {
             getNext().close(type);
-        }
-
-        public void close()
-        {
-            getNext().close();
         }
     }
 }

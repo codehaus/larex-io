@@ -31,5 +31,10 @@ public enum StreamType
     /**
      * <p>The output stream of a channel.</p>
      */
-    OUTPUT
+    OUTPUT,
+
+    /**
+     * <p>Both streams of a channel.</p>
+     */
+    INPUT_OUTPUT
 }

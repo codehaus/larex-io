@@ -73,11 +73,4 @@ public interface Controller
      * @see Channel#close(StreamType)
      */
     void close(StreamType type);
-
-    /**
-     * <p>Closes the channel associated with this coordinator.</p>
-     *
-     * @see Channel#close()
-     */
-    void close();
 }

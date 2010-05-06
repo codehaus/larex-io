@@ -121,31 +121,31 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void closingEvent()
+    public final void closingEvent(StreamType type)
     {
-        doOnClosing();
-        onClosing();
+        doOnClosing(type);
+        onClosing(type);
     }
 
-    void doOnClosing()
-    {
-    }
-
-    protected void onClosing()
+    void doOnClosing(StreamType type)
     {
     }
 
-    public final void closedEvent()
-    {
-        doOnClosed();
-        onClosed();
-    }
-
-    void doOnClosed()
+    protected void onClosing(StreamType type)
     {
     }
 
-    protected void onClosed()
+    public final void closedEvent(StreamType type)
+    {
+        doOnClosed(type);
+        onClosed(type);
+    }
+
+    void doOnClosed(StreamType type)
+    {
+    }
+
+    protected void onClosed(StreamType type)
     {
     }
 }

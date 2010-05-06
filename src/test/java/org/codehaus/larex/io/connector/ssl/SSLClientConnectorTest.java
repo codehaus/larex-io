@@ -37,6 +37,7 @@ import org.codehaus.larex.io.AbstractTestCase;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.StandardConnection;
+import org.codehaus.larex.io.StreamType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -156,13 +157,13 @@ public class SSLClientConnectorTest extends AbstractTestCase
                         }
 
                         @Override
-                        public void onClosing()
+                        public void onClosing(StreamType type)
                         {
                             closingLatch.countDown();
                         }
 
                         @Override
-                        protected void onClosed()
+                        protected void onClosed(StreamType type)
                         {
                             closedLatch.countDown();
                         }
@@ -241,13 +242,13 @@ public class SSLClientConnectorTest extends AbstractTestCase
                         }
 
                         @Override
-                        public void onClosing()
+                        public void onClosing(StreamType type)
                         {
                             closingLatch.countDown();
                         }
 
                         @Override
-                        protected void onClosed()
+                        protected void onClosed(StreamType type)
                         {
                             closedLatch.countDown();
                         }

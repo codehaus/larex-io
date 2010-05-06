@@ -93,7 +93,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         }
         catch (SSLException x)
         {
-            close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeIOException(x);
         }
     }
@@ -157,7 +157,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         }
         catch (SSLException x)
         {
-            close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeIOException(x);
         }
         finally
@@ -288,13 +288,8 @@ public class SSLInterceptor extends Interceptor.Forwarder
     @Override
     public void close(StreamType type)
     {
-        // TODO
-        super.close(type);
-    }
+        // TODO: handle stream types
 
-    @Override
-    public void close()
-    {
         ByteBuffer sslBuffer = sslByteBuffers.acquire(sslEngine.getSession().getPacketBufferSize(), false);
         try
         {
@@ -311,7 +306,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     }
                     case NEED_UNWRAP:
                     {
-                        super.close();
+                        super.close(type);
                         break out;
                     }
                     default:
@@ -347,7 +342,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         }
         catch (SSLException x)
         {
-            close();
+            controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeIOException(x);
         }
         finally
@@ -451,10 +446,11 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public void onClosing()
+    public void onClosing(StreamType type)
     {
-        flusher.closeEvent();
-        super.onClosing();
+        if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
+            flusher.closeEvent();
+        super.onClosing(type);
     }
 
     private class SSLFlusher extends Flusher
@@ -473,7 +469,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         @Override
         protected void close()
         {
-            SSLInterceptor.this.close();
+            SSLInterceptor.this.controller.close(StreamType.INPUT_OUTPUT);
         }
     }
 }

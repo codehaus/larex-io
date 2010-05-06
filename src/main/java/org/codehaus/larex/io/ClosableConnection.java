@@ -61,12 +61,15 @@ public abstract class ClosableConnection extends AbstractConnection
     }
 
     @Override
-    void doOnClosed()
+    void doOnClosed(StreamType type)
     {
-        super.doOnClosed();
-        CountDownLatch softClose = this.softClose;
-        if (softClose != null)
-            softClose.countDown();
+        super.doOnClosed(type);
+        if (type == StreamType.INPUT_OUTPUT)
+        {
+            CountDownLatch softClose = this.softClose;
+            if (softClose != null)
+                softClose.countDown();
+        }
     }
 
     /**
@@ -91,12 +94,8 @@ public abstract class ClosableConnection extends AbstractConnection
      */
     public final void close()
     {
-        doClose();
-        getController().close();
-    }
-
-    void doClose()
-    {
+        doClose(StreamType.INPUT_OUTPUT);
+        getController().close(StreamType.INPUT_OUTPUT);
     }
 
     /**

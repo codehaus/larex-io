@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
  * of events that are related to the activity happening on the connection.</p>
  * <p>These events involve {@link #prepareEvent() connection opening}, {@link #readEvent(ByteBuffer) read}
  * and {@link #writeEvent() write} events, close events ({@link #remoteCloseEvent() remote} and
- * {@link #closingEvent() local}) and timeout events.</p>
+ * {@link #closingEvent(StreamType) local}) and timeout events.</p>
  * <p>User code would prefer to extend from {@link Connection} implementations such as
  * {@link StandardConnection} or {@link BlockingConnection}.</p>
  * <br />
@@ -75,11 +75,13 @@ public interface Connection
 
     /**
      * <p>Callback called when this connection is about to be closed.</p>
+     * @param type the stream type that is about to close
      */
-    void closingEvent();
+    void closingEvent(StreamType type);
 
     /**
      * <p>Callback called when this connection has been closed.</p>
+     * @param type the stream type that has been closed
      */
-    void closedEvent();
+    void closedEvent(StreamType type);
 }

@@ -145,6 +145,8 @@ public abstract class BlockingConnection extends FlushableConnection
     @Override
     void doClose(StreamType type)
     {
+        // TODO: fix this: needs to handle all stream types
+
         super.doClose(type);
         if (type == StreamType.INPUT)
         {
@@ -153,17 +155,6 @@ public abstract class BlockingConnection extends FlushableConnection
                 readState = ReadState.CLOSE;
                 notify();
             }
-        }
-    }
-
-    @Override
-    void doClose()
-    {
-        super.doClose();
-        synchronized (this)
-        {
-            readState = ReadState.CLOSE;
-            notify();
         }
     }
 
