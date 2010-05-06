@@ -26,15 +26,15 @@ public class StandardConnection extends FlushableConnection
 {
     private final CountDownLatch ready = new CountDownLatch(1);
 
-    public StandardConnection(Coordinator coordinator)
+    public StandardConnection(Controller controller)
     {
-        super(coordinator);
+        super(controller);
     }
 
     void doOnPrepare()
     {
         super.doOnPrepare();
-        getCoordinator().needsRead(true);
+        getController().needsRead(true);
     }
 
     @Override
@@ -51,9 +51,9 @@ public class StandardConnection extends FlushableConnection
 
     public static class Factory implements ConnectionFactory<StandardConnection>
     {
-        public StandardConnection newConnection(Coordinator coordinator)
+        public StandardConnection newConnection(Controller controller)
         {
-            return new StandardConnection(coordinator);
+            return new StandardConnection(controller);
         }
     }
 }

@@ -56,7 +56,6 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                             {
                                 public AtomicInteger writes = new AtomicInteger(0);
 
-                                @Override
                                 public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
                                 {
                                     if (writes.addAndGet(1) == 1)

@@ -37,7 +37,7 @@ import java.nio.ByteBuffer;
 public interface Connection
 {
     /**
-     * <p>Callback method called when this connection is opened.</p>
+     * <p>Callback method called when this connection is to be prepared.</p>
      */
     void prepareEvent();
 

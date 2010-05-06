@@ -84,7 +84,6 @@ public class TimeoutCoordinator extends StandardCoordinator
         super.onWriteReady();
     }
 
-    @Override
     public void needsRead(boolean needsRead)
     {
         if (needsRead && readTimeout > 0)
@@ -92,7 +91,6 @@ public class TimeoutCoordinator extends StandardCoordinator
         super.needsRead(needsRead);
     }
 
-    @Override
     public void needsWrite(boolean needsWrite)
     {
         if (needsWrite && writeTimeout > 0)

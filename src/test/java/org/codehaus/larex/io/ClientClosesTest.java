@@ -42,9 +42,9 @@ public class ClientClosesTest extends AbstractTestCase
         final CountDownLatch closeLatch = new CountDownLatch(1);
         ServerConnector serverConnector = new ServerConnector(new InetSocketAddress("localhost", 0), new ConnectionFactory()
         {
-            public Connection newConnection(Coordinator coordinator)
+            public Connection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     public void onRemoteClose()
@@ -95,9 +95,9 @@ public class ClientClosesTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
         ServerConnector serverConnector = new ServerConnector(address, new ConnectionFactory()
         {
-            public Connection newConnection(Coordinator coordinator)
+            public Connection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     protected void onRead(ByteBuffer buffer)
@@ -180,9 +180,9 @@ public class ClientClosesTest extends AbstractTestCase
             };
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         protected void onRead(ByteBuffer buffer)
@@ -231,9 +231,9 @@ public class ClientClosesTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
         ServerConnector serverConnector = new ServerConnector(address, new ConnectionFactory()
         {
-            public Connection newConnection(Coordinator coordinator)
+            public Connection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     protected void onRead(ByteBuffer buffer)
@@ -289,9 +289,9 @@ public class ClientClosesTest extends AbstractTestCase
             };
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         protected void onRead(ByteBuffer buffer)

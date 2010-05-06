@@ -58,9 +58,9 @@ public class StandardClientConnectorTest extends AbstractTestCase
             ClientConnector clientConnector = new ClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         protected void onRead(ByteBuffer buffer)

@@ -43,9 +43,9 @@ public abstract class BlockingConnection extends FlushableConnection
     private ByteBuffer buffer;
     private ReadState readState = ReadState.WAIT;
 
-    public BlockingConnection(Coordinator coordinator)
+    public BlockingConnection(Controller controller)
     {
-        super(coordinator);
+        super(controller);
     }
 
     public abstract void onOpen();
@@ -91,7 +91,7 @@ public abstract class BlockingConnection extends FlushableConnection
     protected int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
     {
         int start = buffer.position();
-        getCoordinator().setReadBufferSize(buffer.remaining());
+        getController().setReadBufferSize(buffer.remaining());
 
         synchronized (this)
         {
@@ -100,7 +100,7 @@ public abstract class BlockingConnection extends FlushableConnection
 
             this.buffer = buffer;
             readState = ReadState.WAIT;
-            getCoordinator().needsRead(true);
+            getController().needsRead(true);
             while (readState == ReadState.WAIT)
             {
                 try

@@ -45,9 +45,9 @@ public class ServerReadsZeroTest extends AbstractTestCase
         ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
-            protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
+            protected Channel newChannel(SocketChannel channel, Controller controller)
             {
-                return new StandardChannel(channel, coordinator)
+                return new StandardChannel(channel, controller)
                 {
                     private final AtomicInteger reads = new AtomicInteger();
 
@@ -79,7 +79,6 @@ public class ServerReadsZeroTest extends AbstractTestCase
                         reads.countDown();
                     }
 
-                    @Override
                     public void needsRead(boolean needsRead)
                     {
                         needReads.countDown();

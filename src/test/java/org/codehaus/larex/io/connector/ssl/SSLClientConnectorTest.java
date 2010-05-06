@@ -35,7 +35,7 @@ import javax.net.ssl.SSLSocket;
 
 import org.codehaus.larex.io.AbstractTestCase;
 import org.codehaus.larex.io.ConnectionFactory;
-import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.StandardConnection;
 import org.junit.After;
 import org.junit.Before;
@@ -145,9 +145,9 @@ public class SSLClientConnectorTest extends AbstractTestCase
             final CountDownLatch closedLatch = new CountDownLatch(1);
             SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         public void onRemoteClose()
@@ -223,9 +223,9 @@ public class SSLClientConnectorTest extends AbstractTestCase
             final CountDownLatch closedLatch = new CountDownLatch(1);
             SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         public void onRead(ByteBuffer buffer)
@@ -392,9 +392,9 @@ public class SSLClientConnectorTest extends AbstractTestCase
             final CountDownLatch clientLatch = new CountDownLatch(1);
             SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         protected void onRead(ByteBuffer buffer)
@@ -433,9 +433,9 @@ public class SSLClientConnectorTest extends AbstractTestCase
         SSLClientConnector connector = new SSLClientConnector(getThreadPool(), getScheduler());
         StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
         {
-            public StandardConnection newConnection(Coordinator coordinator)
+            public StandardConnection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     protected void onRead(ByteBuffer buffer)

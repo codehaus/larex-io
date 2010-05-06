@@ -41,9 +41,9 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
 
         ConnectionFactory connectionFactory = new ConnectionFactory()
         {
-            public Connection newConnection(Coordinator coordinator)
+            public Connection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     public void onOpen()
@@ -64,9 +64,9 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
         ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
         StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
         {
-            public StandardConnection newConnection(Coordinator coordinator)
+            public StandardConnection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     protected void onRead(ByteBuffer buffer)

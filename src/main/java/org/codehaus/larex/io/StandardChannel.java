@@ -34,15 +34,15 @@ public class StandardChannel implements Channel
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final boolean debug = logger.isDebugEnabled();
     private final SocketChannel channel;
-    private final Coordinator coordinator;
+    private final Controller controller;
     private volatile int readAggressiveness;
     private volatile int writeAggressiveness;
     private volatile SelectionKey selectionKey;
 
-    public StandardChannel(SocketChannel channel, Coordinator coordinator)
+    public StandardChannel(SocketChannel channel, Controller controller)
     {
         this.channel = channel;
-        this.coordinator = coordinator;
+        this.controller = controller;
         setReadAggressiveness(2);
         setWriteAggressiveness(2);
     }
@@ -109,12 +109,12 @@ public class StandardChannel implements Channel
         }
         catch (ClosedChannelException x)
         {
-            coordinator.close();
+            controller.close();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
-            coordinator.close();
+            controller.close();
             throw new RuntimeIOException(x);
         }
     }
@@ -140,13 +140,13 @@ public class StandardChannel implements Channel
         catch (ClosedChannelException x)
         {
             logger.debug("Channel closed during write of {} bytes", buffer.remaining());
-            coordinator.close();
+            controller.close();
             throw new RuntimeSocketClosedException(x);
         }
         catch (IOException x)
         {
             logger.debug("Unexpected IOException", x);
-            coordinator.close();
+            controller.close();
             throw new RuntimeIOException(x);
         }
     }

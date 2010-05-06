@@ -103,9 +103,9 @@ public class LoadClientMain
 
             ConnectionFactory<LatencyConnection> connectionFactory = new ConnectionFactory<LatencyConnection>()
             {
-                public LatencyConnection newConnection(Coordinator coordinator)
+                public LatencyConnection newConnection(Controller controller)
                 {
-                    return new LatencyConnection(coordinator);
+                    return new LatencyConnection(controller);
                 }
             };
             InetSocketAddress address = new InetSocketAddress(host, port);
@@ -329,9 +329,9 @@ public class LoadClientMain
         private long time = 0;
         private int timeBytes = 0;
 
-        private LatencyConnection(Coordinator coordinator)
+        private LatencyConnection(Controller controller)
         {
-            super(coordinator);
+            super(controller);
         }
 
         @Override

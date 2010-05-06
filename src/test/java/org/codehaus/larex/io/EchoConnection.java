@@ -23,9 +23,9 @@ import java.nio.ByteBuffer;
  */
 public class EchoConnection extends StandardConnection
 {
-    public EchoConnection(Coordinator coordinator)
+    public EchoConnection(Controller controller)
     {
-        super(coordinator);
+        super(controller);
     }
 
     @Override
@@ -36,9 +36,9 @@ public class EchoConnection extends StandardConnection
 
     public static class Factory implements ConnectionFactory<EchoConnection>
     {
-        public EchoConnection newConnection(Coordinator coordinator)
+        public EchoConnection newConnection(Controller controller)
         {
-            return new EchoConnection(coordinator);
+            return new EchoConnection(controller);
         }
     }
 }

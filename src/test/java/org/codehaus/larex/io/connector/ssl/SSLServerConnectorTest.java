@@ -30,7 +30,7 @@ import javax.net.ssl.SSLSocket;
 import org.codehaus.larex.io.AbstractTestCase;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
-import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.EchoConnection;
 import org.junit.After;
 import org.junit.Test;
@@ -97,9 +97,9 @@ public class SSLServerConnectorTest extends AbstractTestCase
         final CountDownLatch latch = new CountDownLatch(1);
         int port = initServerConnector(new ConnectionFactory()
         {
-            public Connection newConnection(Coordinator coordinator)
+            public Connection newConnection(Controller controller)
             {
-                return new EchoConnection(coordinator)
+                return new EchoConnection(controller)
                 {
                     @Override
                     protected void onRemoteClose()
@@ -140,9 +140,9 @@ public class SSLServerConnectorTest extends AbstractTestCase
         final CountDownLatch latch = new CountDownLatch(1);
         int port = initServerConnector(new ConnectionFactory()
         {
-            public Connection newConnection(Coordinator coordinator)
+            public Connection newConnection(Controller controller)
             {
-                return new EchoConnection(coordinator)
+                return new EchoConnection(controller)
                 {
                     @Override
                     protected void onRemoteClose()

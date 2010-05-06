@@ -29,6 +29,7 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Channel;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
@@ -154,9 +155,9 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
         return connection;
     }
 
-    protected C newConnection(Coordinator coordinator)
+    protected C newConnection(Controller controller)
     {
-        return connectionFactory.newConnection(coordinator);
+        return connectionFactory.newConnection(controller);
     }
 
     protected Coordinator newCoordinator()
@@ -164,14 +165,14 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
         return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout());
     }
 
-    protected Channel newChannel(Coordinator coordinator)
+    protected Channel newChannel(Controller controller)
     {
-        return new StandardChannel(getSocketChannel(), coordinator);
+        return new StandardChannel(getSocketChannel(), controller);
     }
 
-    protected void register(Channel channel, Coordinator coordinator)
+    protected void register(Channel channel, Selector.Listener listener)
     {
-        getSelector().register(channel, coordinator);
+        getSelector().register(channel, listener);
     }
 
     private void close()

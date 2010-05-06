@@ -42,9 +42,9 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
         ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
         {
             @Override
-            protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
+            protected Channel newChannel(SocketChannel channel, Controller controller)
             {
-                return new StandardChannel(channel, coordinator)
+                return new StandardChannel(channel, controller)
                 {
                     @Override
                     public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException
@@ -62,10 +62,10 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
             }
 
             @Override
-            protected void register(Selector selector, Channel channel, Coordinator coordinator)
+            protected void register(Selector selector, Channel channel, Selector.Listener listener)
             {
                 channel.close();
-                super.register(selector, channel, coordinator);
+                super.register(selector, channel, listener);
             }
         };
         int port = serverConnector.listen();
@@ -76,9 +76,9 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
             ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         public void onRemoteClose()

@@ -30,10 +30,10 @@ public abstract class FlushableConnection extends ClosableConnection
 {
     private final Flusher flusher;
 
-    protected FlushableConnection(Coordinator coordinator)
+    protected FlushableConnection(Controller controller)
     {
-        super(coordinator);
-        this.flusher = new ConnectionFlusher(coordinator);
+        super(controller);
+        this.flusher = new ConnectionFlusher(controller);
     }
 
     /**
@@ -101,14 +101,14 @@ public abstract class FlushableConnection extends ClosableConnection
      */
     public final int write(ByteBuffer buffer)
     {
-        return getCoordinator().write(buffer);
+        return getController().write(buffer);
     }
 
     private class ConnectionFlusher extends Flusher
     {
-        private ConnectionFlusher(Coordinator coordinator)
+        private ConnectionFlusher(Controller controller)
         {
-            super(coordinator);
+            super(controller);
         }
 
         @Override

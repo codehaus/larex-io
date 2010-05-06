@@ -22,7 +22,7 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 
 import org.codehaus.larex.io.ByteBuffers;
-import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Flusher;
 import org.codehaus.larex.io.Interceptor;
 import org.codehaus.larex.io.RuntimeIOException;
@@ -36,24 +36,24 @@ public class SSLInterceptor extends Interceptor.Forwarder
 {
     private final ByteBuffers sslByteBuffers;
     private final SSLEngine sslEngine;
-    private final Coordinator coordinator;
+    private final Controller controller;
     private final SSLFlusher flusher;
     private volatile boolean handshaking = true;
     private volatile ByteBuffer sslBuffer;
 
-    public SSLInterceptor(ByteBuffers sslByteBuffers, SSLEngine sslEngine, Coordinator coordinator)
+    public SSLInterceptor(ByteBuffers sslByteBuffers, SSLEngine sslEngine, Controller controller)
     {
         this.sslByteBuffers = sslByteBuffers;
         this.sslEngine = sslEngine;
-        this.coordinator = coordinator;
-        this.flusher = new SSLFlusher(coordinator);
+        this.controller = controller;
+        this.flusher = new SSLFlusher(controller);
     }
 
     @Override
     public void onPrepare()
     {
         super.onPrepare();
-        coordinator.needsRead(false);
+        controller.needsRead(false);
     }
 
     @Override
@@ -82,7 +82,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     case NEED_UNWRAP:
                     {
                         // We are done with sending, break out to read
-                        coordinator.needsRead(true);
+                        controller.needsRead(true);
                         break out;
                     }
                     default:
@@ -459,9 +459,9 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
     private class SSLFlusher extends Flusher
     {
-        private SSLFlusher(Coordinator coordinator)
+        private SSLFlusher(Controller controller)
         {
-            super(coordinator);
+            super(controller);
         }
 
         @Override

@@ -35,7 +35,7 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.CachedByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
-import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.connector.ServerConnector;
@@ -77,14 +77,14 @@ public class SSLServerConnector extends ServerConnector
     }
 
     @Override
-    protected Connection newConnection(SocketChannel socketChannel, Coordinator coordinator)
+    protected Connection newConnection(SocketChannel socketChannel, Controller controller)
     {
         String host = socketChannel.socket().getInetAddress().getHostAddress();
         int port = socketChannel.socket().getPort();
         SSLEngine sslEngine = getSSLContext().createSSLEngine(host, port);
         sslEngine.setUseClientMode(false);
-        coordinator.addInterceptor(new SSLInterceptor(getSSLByteBuffers(), sslEngine, coordinator));
-        return super.newConnection(socketChannel, coordinator);
+        controller.addInterceptor(new SSLInterceptor(getSSLByteBuffers(), sslEngine, controller));
+        return super.newConnection(socketChannel, controller);
     }
 
     public String getProtocolAlgorithm()

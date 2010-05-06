@@ -23,7 +23,7 @@ import javax.net.ssl.SSLEngine;
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
-import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.connector.StandardEndpoint;
@@ -47,14 +47,14 @@ public class SSLEndpoint<C extends Connection> extends StandardEndpoint<C>
     }
 
     @Override
-    protected C newConnection(Coordinator coordinator)
+    protected C newConnection(Controller controller)
     {
         String host = getSocketChannel().socket().getInetAddress().getHostAddress();
         int port = getSocketChannel().socket().getPort();
         sslEngine = sslContext.createSSLEngine(host, port);
         sslEngine.setUseClientMode(true);
-        coordinator.addInterceptor(new SSLInterceptor(sslByteBuffers, sslEngine, coordinator));
-        return super.newConnection(coordinator);
+        controller.addInterceptor(new SSLInterceptor(sslByteBuffers, sslEngine, controller));
+        return super.newConnection(controller);
     }
 
     public SSLEngine getSSLEngine()

@@ -44,20 +44,20 @@ import org.slf4j.LoggerFactory;
 public abstract class ClosableConnection extends AbstractConnection
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
-    private final Coordinator coordinator;
+    private final Controller controller;
     private volatile CountDownLatch softClose;
 
-    protected ClosableConnection(Coordinator coordinator)
+    protected ClosableConnection(Controller controller)
     {
-        this.coordinator = coordinator;
+        this.controller = controller;
     }
 
     /**
-     * @return the coordinator associated with this connection
+     * @return the controller associated with this connection
      */
-    protected Coordinator getCoordinator()
+    protected Controller getController()
     {
-        return coordinator;
+        return controller;
     }
 
     @Override
@@ -77,7 +77,7 @@ public abstract class ClosableConnection extends AbstractConnection
     public final void close(StreamType type)
     {
         doClose(type);
-        getCoordinator().close(type);
+        getController().close(type);
     }
 
     void doClose(StreamType type)
@@ -92,7 +92,7 @@ public abstract class ClosableConnection extends AbstractConnection
     public final void close()
     {
         doClose();
-        getCoordinator().close();
+        getController().close();
     }
 
     void doClose()

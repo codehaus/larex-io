@@ -44,9 +44,9 @@ public class ClientReadTimeoutTest extends AbstractTestCase
             ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
             Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                public StandardConnection newConnection(Coordinator coordinator)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    return new StandardConnection(coordinator)
+                    return new StandardConnection(controller)
                     {
                         @Override
                         public void onReadTimeout()

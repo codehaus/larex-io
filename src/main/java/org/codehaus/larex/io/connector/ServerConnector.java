@@ -29,6 +29,7 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Channel;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.ReadWriteSelector;
 import org.codehaus.larex.io.RuntimeIOException;
@@ -261,19 +262,19 @@ public class ServerConnector
         return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout());
     }
 
-    protected Channel newChannel(SocketChannel channel, Coordinator coordinator)
+    protected Channel newChannel(SocketChannel channel, Controller controller)
     {
-        return new StandardChannel(channel, coordinator);
+        return new StandardChannel(channel, controller);
     }
 
-    protected Connection newConnection(SocketChannel socketChannel, Coordinator coordinator)
+    protected Connection newConnection(SocketChannel socketChannel, Controller controller)
     {
-        return connectionFactory.newConnection(coordinator);
+        return connectionFactory.newConnection(controller);
     }
 
-    protected void register(Selector selector, Channel channel, Coordinator coordinator)
+    protected void register(Selector selector, Channel channel, Selector.Listener listener)
     {
-        selector.register(channel, coordinator);
+        selector.register(channel, listener);
     }
 
     protected class Acceptor implements Runnable

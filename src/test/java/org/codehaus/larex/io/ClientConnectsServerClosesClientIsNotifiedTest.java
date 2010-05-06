@@ -43,9 +43,9 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
         ConnectionFactory<StandardConnection> connectionFactory = new ConnectionFactory<StandardConnection>()
         {
-            public StandardConnection newConnection(Coordinator coordinator)
+            public StandardConnection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     public void onOpen()
@@ -66,7 +66,7 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                 return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler())
                 {
                     @Override
-                    protected void register(Channel channel, Coordinator coordinator)
+                    protected void register(Channel channel, Selector.Listener listener)
                     {
                         try
                         {
@@ -75,7 +75,7 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                             connection.flush(ByteBuffer.wrap(new byte[]{1}));
                             connection.close();
                             Thread.sleep(500);
-                            super.register(channel, coordinator);
+                            super.register(channel, listener);
                         }
                         catch (InterruptedException x)
                         {
@@ -88,9 +88,9 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
         final CountDownLatch latch = new CountDownLatch(2);
         connector.newEndpoint(new ConnectionFactory<StandardConnection>()
         {
-            public StandardConnection newConnection(Coordinator coordinator)
+            public StandardConnection newConnection(Controller controller)
             {
-                return new StandardConnection(coordinator)
+                return new StandardConnection(controller)
                 {
                     @Override
                     protected void onRead(ByteBuffer buffer)

@@ -33,15 +33,15 @@ public abstract class Flusher
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private final Lock flushLock = new ReentrantLock();
     private final Condition flushCondition = flushLock.newCondition();
-    private final Coordinator coordinator;
+    private final Controller coordinator;
     /**
      * Field updates are guarded by {@link #flushLock}
      */
     private FlushState flushState = FlushState.WRITE;
 
-    protected Flusher(Coordinator coordinator)
+    protected Flusher(Controller controller)
     {
-        this.coordinator = coordinator;
+        this.coordinator = controller;
     }
 
     protected abstract int write(ByteBuffer buffer);

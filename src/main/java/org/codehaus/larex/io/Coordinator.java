@@ -16,8 +16,6 @@
 
 package org.codehaus.larex.io;
 
-import java.nio.ByteBuffer;
-
 /**
  * <p>{@link Coordinator} coordinates the activity between the {@link Channel},
  * the {@link Connection} and the {@link Selector}.</p>
@@ -26,7 +24,7 @@ import java.nio.ByteBuffer;
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface Coordinator extends Selector.Listener
+public interface Coordinator extends Selector.Listener, Controller
 {
     /**
      * @param channel the channel associated with this coordinator
@@ -37,61 +35,4 @@ public interface Coordinator extends Selector.Listener
      * @param connection the connection associated with this coordinator
      */
     public void setConnection(Connection connection);
-
-    /**
-     * @param size the size of the read buffer
-     */
-    public void setReadBufferSize(int size);
-
-    public void addInterceptor(Interceptor interceptor);
-    public boolean removeInterceptor(Interceptor interceptor);
-
-    /**
-     * <p>Asks the I/O system to register (if {@code needsRead} is true) or
-     * to deregister (if {@code needsRead} is false) for interest in read events.</p>
-     * <p>Normally, a connection will call this method when it detects that
-     * a request is not complete and more data needs to be read.</p>
-     *
-     * @param needsRead true to indicate that there is interest in receiving read events,
-     *                  false to indicate that there is no interest in receiving read events.
-     */
-    public void needsRead(boolean needsRead);
-
-    /**
-     * <p>Asks the I/O system to register (if {@code needsWrite} is true) or
-     * to deregister (if {@code needsWrite} is false) for interest in write events.</p>
-     * <p>Normally, a channel will call this method when it detects that it cannot
-     * write more bytes to the I/O system.</p>
-     *
-     * @param needsWrite true to indicate that there is interest in receiving read events,
-     *                   false to indicate that there is no interest in receiving read events.
-     */
-    public void needsWrite(boolean needsWrite);
-
-    /**
-     * <p>Non-blocking writes bytes from the given {@code buffer}.</p>
-     * <p>Normally, a connection will call this method after it filled the buffer with bytes
-     * to write, and this coordinator will forward the call to the channel.</p>
-     *
-     * @param buffer the buffer to write bytes from
-     * @return the number of bytes written
-     * @throws RuntimeSocketClosedException if the associated channel has been closed
-     * @see Channel#write(ByteBuffer)
-     */
-    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
-
-    /**
-     * <p>Closes the given stream type of the channel associated with this coordinator.</p>
-     *
-     * @param type the stream type to close
-     * @see Channel#close(StreamType)
-     */
-    public void close(StreamType type);
-
-    /**
-     * <p>Closes the channel associated with this coordinator.</p>
-     *
-     * @see Channel#close()
-     */
-    public void close();
 }
