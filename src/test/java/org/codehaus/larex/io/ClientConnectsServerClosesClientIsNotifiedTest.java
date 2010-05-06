@@ -48,7 +48,7 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    public void onReady()
+                    public void onOpen()
                     {
                         serverConnection.set(this);
                         serverConnectionLatch.countDown();

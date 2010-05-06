@@ -22,9 +22,9 @@ import java.nio.channels.ClosedByInterruptException;
 /**
  * <p>Implementation of {@link Connection} that provides blocking read functionality
  * and inherits flush and close functionalities.</p>
- * <p>User code must implement {@link #readyEvent()}, typically in the following way:</p>
+ * <p>User code must implement {@link #openEvent()}, typically in the following way:</p>
  * <pre>
- * public void onReady()
+ * public void onOpen()
  * {
  *     ByteBuffer readBuffer = ByteBuffer.allocate(256);
  *     int read = read(readBuffer);
@@ -48,7 +48,7 @@ public abstract class BlockingConnection extends FlushableConnection
         super(coordinator);
     }
 
-    public abstract void onReady();
+    public abstract void onOpen();
 
     /**
      * <p>Overridden to implement the blocking read functionality.</p>

@@ -23,6 +23,20 @@ import java.nio.ByteBuffer;
  */
 public class AbstractConnection implements Connection
 {
+    public final void prepareEvent()
+    {
+        doOnPrepare();
+        onPrepare();
+    }
+
+    void doOnPrepare()
+    {
+    }
+
+    protected void onPrepare()
+    {
+    }
+
     public final void openEvent()
     {
         doOnOpen();
@@ -34,20 +48,6 @@ public class AbstractConnection implements Connection
     }
 
     protected void onOpen()
-    {
-    }
-
-    public final void readyEvent()
-    {
-        doOnReady();
-        onReady();
-    }
-
-    void doOnReady()
-    {
-    }
-
-    protected void onReady()
     {
     }
 

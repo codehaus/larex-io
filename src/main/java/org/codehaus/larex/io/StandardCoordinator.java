@@ -32,10 +32,10 @@ public class StandardCoordinator implements Coordinator
     private final Selector selector;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
-    private final Runnable onReadyCommand = new OnReadyCommand();
-    private final Runnable readCommand = new ReadCommand();
-    private final Runnable onWriteCommand = new OnWriteCommand();
-    private final Runnable closeCommand = new CloseCommand();
+    private final Runnable onOpenAction = new OnOpenAction();
+    private final Runnable onReadAction = new OnReadAction();
+    private final Runnable onWriteAction = new OnWriteAction();
+    private final Runnable onCloseAction = new OnCloseAction();
     private final Interceptor headInterceptor = new Interceptor.Forwarder();
     private final Interceptor tailInterceptor = new StandardInterceptor();
     private volatile Channel channel;
@@ -120,8 +120,8 @@ public class StandardCoordinator implements Coordinator
 
     public void onOpen()
     {
-        getConnection().openEvent(); // TODO: forward this also to interceptor ?
-        getThreadPool().execute(onReadyCommand);
+        getInterceptor().onPrepare();
+        getThreadPool().execute(onOpenAction);
     }
 
     public void onReadReady()
@@ -130,7 +130,7 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to read
         needsRead(false);
         // Dispatch the read to another thread
-        getThreadPool().execute(readCommand);
+        getThreadPool().execute(onReadAction);
     }
 
     public void onWriteReady()
@@ -139,12 +139,12 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
-        getThreadPool().execute(onWriteCommand);
+        getThreadPool().execute(onWriteAction);
     }
 
     public void onClose()
     {
-        getThreadPool().execute(closeCommand);
+        getThreadPool().execute(onCloseAction);
     }
 
     public void needsRead(boolean needsRead)
@@ -192,17 +192,12 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    protected void onReady()
+    protected void onOpenAction()
     {
-        getInterceptor().onReady();
+        getInterceptor().onOpen();
     }
 
-    protected void onWrite()
-    {
-        getInterceptor().onWrite();
-    }
-
-    protected void read()
+    protected void onReadAction()
     {
         int read;
         boolean closed;
@@ -258,6 +253,16 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
+    protected void onWriteAction()
+    {
+        getInterceptor().onWrite();
+    }
+
+    protected void onCloseAction()
+    {
+        close();
+    }
+
     protected void onRead(ByteBuffer buffer)
     {
         try
@@ -275,21 +280,21 @@ public class StandardCoordinator implements Coordinator
         return headInterceptor;
     }
 
-    private class OnReadyCommand implements Runnable
+    private class OnOpenAction implements Runnable
     {
         public void run()
         {
-            onReady();
+            onOpenAction();
         }
     }
 
-    private class ReadCommand implements Runnable
+    private class OnReadAction implements Runnable
     {
         public void run()
         {
             try
             {
-                read();
+                onReadAction();
             }
             catch (RuntimeSocketClosedException x)
             {
@@ -302,21 +307,28 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    private class OnWriteCommand implements Runnable
-    {
-        public void run()
-        {
-            onWrite();
-        }
-    }
-
-    private class CloseCommand implements Runnable
+    private class OnWriteAction implements Runnable
     {
         public void run()
         {
             try
             {
-                close();
+                onWriteAction();
+            }
+            catch (Exception x)
+            {
+                logger.info("Unexpected exception", x);
+            }
+        }
+    }
+
+    private class OnCloseAction implements Runnable
+    {
+        public void run()
+        {
+            try
+            {
+                onCloseAction();
             }
             catch (Exception x)
             {
@@ -337,11 +349,16 @@ public class StandardCoordinator implements Coordinator
             throw new UnsupportedOperationException();
         }
 
-        public void onReady()
+        public void onPrepare()
+        {
+            getConnection().prepareEvent();
+        }
+
+        public void onOpen()
         {
             try
             {
-                getConnection().readyEvent();
+                getConnection().openEvent();
             }
             catch (Exception x)
             {

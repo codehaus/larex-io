@@ -51,42 +51,29 @@ public class ServerConnector
     private final Executor threadPool;
     private final Scheduler scheduler;
     private final ByteBuffers byteBuffers;
-    private final Selector[] selectors;
-    private final AtomicInteger selector = new AtomicInteger();
+    private final AtomicInteger selectorIndex = new AtomicInteger();
+    private volatile int selectorCount = 1;
+    private volatile Selector[] selectors;
+    private volatile int acceptorCount = 1;
+    private volatile Thread[] acceptors;
     private volatile boolean reuseAddress = true;
     private volatile int backlogSize = 128;
     private volatile long readTimeout = 0;
     private volatile long writeTimeout = 0;
-    private volatile Thread acceptorThread;
     private volatile ServerSocketChannel serverChannel;
 
     public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
-    {
-        this(address, connectionFactory, threadPool, scheduler, 1);
-    }
-
-    public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler, int selectors)
     {
         this.address = address;
         this.connectionFactory = connectionFactory;
         this.threadPool = threadPool;
         this.scheduler = scheduler;
         this.byteBuffers = newByteBuffers();
-        if (selectors < 1)
-            throw new IllegalArgumentException("Invalid selectors count " + selectors + ": must be >= 1");
-        this.selectors = new Selector[selectors];
-        for (int i = 0; i < selectors; ++i)
-            this.selectors[i] = newSelector();
     }
 
     protected ByteBuffers newByteBuffers()
     {
         return new ThreadLocalByteBuffers();
-    }
-
-    protected Selector newSelector()
-    {
-        return new ReadWriteSelector();
     }
 
     public Executor getThreadPool()
@@ -104,9 +91,29 @@ public class ServerConnector
         return byteBuffers;
     }
 
-    public Selector[] getSelectors()
+    protected Selector[] getSelectors()
     {
         return selectors;
+    }
+
+    public int getSelectorCount()
+    {
+        return selectorCount;
+    }
+
+    public void setSelectorCount(int selectorCount)
+    {
+        this.selectorCount = selectorCount;
+    }
+
+    public int getAcceptorCount()
+    {
+        return acceptorCount;
+    }
+
+    public void setAcceptorCount(int acceptorCount)
+    {
+        this.acceptorCount = acceptorCount;
     }
 
     public Boolean isReuseAddress()
@@ -163,12 +170,30 @@ public class ServerConnector
             throw new RuntimeIOException(x);
         }
 
-        // TODO: use more acceptor threads ?
-        // TODO: use a thread factory ?
-        threadPool.execute(new Acceptor());
+        this.selectors = new Selector[getSelectorCount()];
+        for (int i = 0; i < selectors.length; ++i)
+            this.selectors[i] = newSelector();
+
+        this.acceptors = new Thread[getAcceptorCount()];
+        for (int i = 0; i < acceptors.length; ++i)
+        {
+            Thread thread = newAcceptorThread(new Acceptor());
+            thread.start();
+            this.acceptors[i] = thread;
+        }
 
         logger.info("ServerConnector {} listening on {}", this, serverChannel.socket().getLocalSocketAddress());
         return serverChannel.socket().getLocalPort();
+    }
+
+    protected Selector newSelector()
+    {
+        return new ReadWriteSelector();
+    }
+
+    protected Thread newAcceptorThread(Runnable acceptor)
+    {
+        return new Thread(acceptor, getClass().getSimpleName() + "-Acceptor");
     }
 
     public void close()
@@ -176,8 +201,12 @@ public class ServerConnector
         logger.debug("ServerConnector {} closing", this);
         try
         {
+            for (Thread acceptor : acceptors)
+                acceptor.interrupt();
+
             for (Selector selector : selectors)
                 selector.close();
+
             serverChannel.close();
             logger.debug("ServerConnector {} closed", this);
         }
@@ -189,10 +218,18 @@ public class ServerConnector
 
     public boolean join(long timeout) throws InterruptedException
     {
+        boolean result = true;
+
+        for (Thread acceptor : acceptors)
+        {
+            acceptor.join(timeout);
+            result &= acceptor.isAlive();
+        }
+
         for (Selector selector : selectors)
-            selector.join(timeout);
-        acceptorThread.join(timeout);
-        return !acceptorThread.isAlive();
+            result &= selector.join(timeout);
+
+        return result;
     }
 
     protected void accepted(SocketChannel socketChannel) throws IOException
@@ -213,7 +250,7 @@ public class ServerConnector
 
     protected Selector chooseSelector()
     {
-        int index = selector.incrementAndGet();
+        int index = selectorIndex.incrementAndGet();
         Selector[] selectors = getSelectors();
         index = Math.abs(index % selectors.length);
         return selectors[index];
@@ -245,7 +282,6 @@ public class ServerConnector
         {
             try
             {
-                acceptorThread = Thread.currentThread();
                 logger.debug("ServerConnector {}, acceptor loop entered", this);
 
                 while (serverChannel.isOpen())

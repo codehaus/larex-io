@@ -50,7 +50,14 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public void onReady()
+    public void onPrepare()
+    {
+        super.onPrepare();
+        coordinator.needsRead(false);
+    }
+
+    @Override
+    public void onOpen()
     {
         try
         {
@@ -75,6 +82,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     case NEED_UNWRAP:
                     {
                         // We are done with sending, break out to read
+                        coordinator.needsRead(true);
                         break out;
                     }
                     default:
@@ -94,7 +102,10 @@ public class SSLInterceptor extends Interceptor.Forwarder
     {
         Runnable task;
         while ((task = sslEngine.getDelegatedTask()) != null)
+        {
             task.run();
+            logger.debug("Executed task {}", task);
+        }
     }
 
     @Override
@@ -131,7 +142,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     {
                         handshaking = false;
                         // TLS handshake completed, now we are ready
-                        super.onReady();
+                        super.onOpen();
                         break out;
                     }
                     default:
@@ -164,8 +175,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
             logger.debug("Wrapping from {} to {}", source, buffer);
             SSLEngineResult result = sslEngine.unwrap(source, buffer);
-            logger.debug("Wrapped from {} to {}", source, buffer);
-            logger.debug("Wrap result: {}", result);
+            logger.debug("Wrapped from {} to {}, result {}", new Object[]{source, buffer, result});
             switch (result.getStatus())
             {
                 case OK:
@@ -254,6 +264,25 @@ public class SSLInterceptor extends Interceptor.Forwarder
             result = local;
         }
         return result;
+    }
+
+    @Override
+    public void onRemoteClose()
+    {
+        try
+        {
+            sslEngine.closeInbound();
+            assert sslEngine.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING;
+            super.onRemoteClose();
+        }
+        catch (SSLException x)
+        {
+            // Could be a truncation attack where a man in the middle
+            // truncates the message then sends a FIN.
+            // Do not signal to the application that the connection was
+            // orderly closed by the remote peer.
+            logger.debug("", x);
+        }
     }
 
     @Override
@@ -354,7 +383,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 }
                 case CLOSED:
                 {
-                    // We have unwrapped a close SSL message, just break 
+                    // We have unwrapped a close SSL message, just break
                     break;
                 }
                 default:

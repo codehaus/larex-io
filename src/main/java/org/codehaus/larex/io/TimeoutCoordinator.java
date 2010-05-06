@@ -101,13 +101,13 @@ public class TimeoutCoordinator extends StandardCoordinator
     }
 
     @Override
-    protected void read()
+    protected void onReadAction()
     {
         // Notify reads in any case, even if we could not change the state
         boolean reading = readState.compareAndSet(ReadState.WAIT, ReadState.READ);
         try
         {
-            super.read();
+            super.onReadAction();
         }
         finally
         {

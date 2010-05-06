@@ -68,6 +68,10 @@ public class StandardSchedulerTest
         assertTrue(elapsed >= 10 * delay);
         assertTrue(elapsed <= 11 * delay);
 
+        // Give time to the scheduler to set the status of the Task
+        Thread.sleep(100);
+        // TODO: perhaps it will be nice to have a Task.join() method that waits, like Future.get()
+
         assertFalse(task.isCancelled());
         assertTrue(task.isCompleted());
     }

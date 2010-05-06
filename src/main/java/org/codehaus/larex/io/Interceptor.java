@@ -30,7 +30,9 @@ public interface Interceptor
 
     void setNext(Interceptor interceptor);
 
-    void onReady();
+    void onPrepare();
+
+    void onOpen();
 
     void onReadTimeout();
 
@@ -67,9 +69,14 @@ public interface Interceptor
             this.next = next;
         }
 
-        public void onReady()
+        public void onPrepare()
         {
-            getNext().onReady();
+            getNext().onPrepare();
+        }
+
+        public void onOpen()
+        {
+            getNext().onOpen();
         }
 
         public void onReadTimeout()

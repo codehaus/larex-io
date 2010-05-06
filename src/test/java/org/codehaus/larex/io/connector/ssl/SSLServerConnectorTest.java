@@ -16,7 +16,10 @@
 
 package org.codehaus.larex.io.connector.ssl;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.HandshakeCompletedEvent;
@@ -25,11 +28,15 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 
 import org.codehaus.larex.io.AbstractTestCase;
+import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.EchoConnection;
 import org.junit.After;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -82,6 +89,93 @@ public class SSLServerConnectorTest extends AbstractTestCase
         {
             sslSocket.close();
         }
+    }
+
+    @Test
+    public void testHandshakeThenClientWritesThenServerEchoesThenClientCloses() throws Exception
+    {
+        final CountDownLatch latch = new CountDownLatch(1);
+        int port = initServerConnector(new ConnectionFactory()
+        {
+            public Connection newConnection(Coordinator coordinator)
+            {
+                return new EchoConnection(coordinator)
+                {
+                    @Override
+                    protected void onRemoteClose()
+                    {
+                        latch.countDown();
+                    }
+                };
+            }
+        });
+
+        // Use a plain socket to connect, so that it can be closed later
+        Socket socket = new Socket("localhost", port);
+        // Wrap the socket
+        SSLContext sslContext = connector.getSSLContext();
+        SSLSocket sslSocket = (SSLSocket)sslContext.getSocketFactory().createSocket(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), true);
+        sslSocket.startHandshake();
+
+        // Send something, wait for echo, then abruptly close
+        String clientMessage = "clientMessage";
+        OutputStream output = sslSocket.getOutputStream();
+        output.write(clientMessage.getBytes("UTF-8"));
+        output.flush();
+
+        InputStream input = sslSocket.getInputStream();
+        byte[] buffer = new byte[clientMessage.length()];
+        int read = input.read(buffer);
+        assertEquals(clientMessage.length(), read);
+        assertEquals(clientMessage, new String(buffer, "UTF-8"));
+
+        sslSocket.close();
+
+        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testHandshakeThenClientWritesThenServerEchoesThenClientAbruptlyCloses() throws Exception
+    {
+        final CountDownLatch latch = new CountDownLatch(1);
+        int port = initServerConnector(new ConnectionFactory()
+        {
+            public Connection newConnection(Coordinator coordinator)
+            {
+                return new EchoConnection(coordinator)
+                {
+                    @Override
+                    protected void onRemoteClose()
+                    {
+                        latch.countDown();
+                    }
+                };
+            }
+        });
+
+        // Use a plain socket to connect, so that it can be closed later
+        Socket socket = new Socket("localhost", port);
+        // Wrap the socket
+        SSLContext sslContext = connector.getSSLContext();
+        SSLSocket sslSocket = (SSLSocket)sslContext.getSocketFactory().createSocket(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), true);
+        sslSocket.startHandshake();
+
+        // Send something, wait for echo, then abruptly close
+        String clientMessage = "clientMessage";
+        OutputStream output = sslSocket.getOutputStream();
+        output.write(clientMessage.getBytes("UTF-8"));
+        output.flush();
+
+        InputStream input = sslSocket.getInputStream();
+        byte[] buffer = new byte[clientMessage.length()];
+        int read = input.read(buffer);
+        assertEquals(clientMessage.length(), read);
+        assertEquals(clientMessage, new String(buffer, "UTF-8"));
+
+        // Close the underlying socket, not the SSL socket, to simulate abrupt close
+        socket.close();
+
+        assertFalse(latch.await(1000, TimeUnit.MILLISECONDS));
     }
 
     // TODO: add more tests

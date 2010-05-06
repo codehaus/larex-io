@@ -31,15 +31,16 @@ public class StandardConnection extends FlushableConnection
         super(coordinator);
     }
 
-    void doOnOpen()
+    void doOnPrepare()
     {
+        super.doOnPrepare();
         getCoordinator().needsRead(true);
     }
 
     @Override
-    void doOnReady()
+    void doOnOpen()
     {
-        super.doOnReady();
+        super.doOnOpen();
         ready.countDown();
     }
 

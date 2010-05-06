@@ -62,12 +62,7 @@ public class SSLServerConnector extends ServerConnector
 
     public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
     {
-        this(address, connectionFactory, threadPool, scheduler, 1);
-    }
-
-    public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler, int selectors)
-    {
-        super(address, connectionFactory, threadPool, scheduler, selectors);
+        super(address, connectionFactory, threadPool, scheduler);
         this.sslByteBuffers = newSSLByteBuffers();
     }
 
@@ -86,7 +81,7 @@ public class SSLServerConnector extends ServerConnector
     {
         String host = socketChannel.socket().getInetAddress().getHostAddress();
         int port = socketChannel.socket().getPort();
-        SSLEngine sslEngine = sslContext.createSSLEngine(host, port);
+        SSLEngine sslEngine = getSSLContext().createSSLEngine(host, port);
         sslEngine.setUseClientMode(false);
         coordinator.addInterceptor(new SSLInterceptor(getSSLByteBuffers(), sslEngine, coordinator));
         return super.newConnection(socketChannel, coordinator);

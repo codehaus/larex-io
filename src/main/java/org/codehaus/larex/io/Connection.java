@@ -21,7 +21,7 @@ import java.nio.ByteBuffer;
 /**
  * <p>{@link Connection} represents an active connection with a remote peer and it is the recipient
  * of events that are related to the activity happening on the connection.</p>
- * <p>These events involve {@link #openEvent() connection opening}, {@link #readEvent(ByteBuffer) read}
+ * <p>These events involve {@link #prepareEvent() connection opening}, {@link #readEvent(ByteBuffer) read}
  * and {@link #writeEvent() write} events, close events ({@link #remoteCloseEvent() remote} and
  * {@link #closingEvent() local}) and timeout events.</p>
  * <p>User code would prefer to extend from {@link Connection} implementations such as
@@ -39,12 +39,12 @@ public interface Connection
     /**
      * <p>Callback method called when this connection is opened.</p>
      */
-    void openEvent();
+    void prepareEvent();
 
     /**
      * <p>Callback method called after the connection has been opened.</p>
      */
-    void readyEvent();
+    void openEvent();
 
     /**
      * <p>Callback method called when this connection has read bytes sent from the remote peer.</p>

@@ -40,8 +40,8 @@ public class StandardSchedulerPerformanceTest
     @Test
     public void testSchedulerPerformance() throws Exception
     {
-        int count = 500;
-        int loops = 100;
+        int count = 5;
+        int loops = 2;
         int sleep = 100;
 
         CountDownLatch latch = new CountDownLatch(count);

@@ -46,7 +46,7 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
                 return new StandardConnection(coordinator)
                 {
                     @Override
-                    public void onReady()
+                    public void onOpen()
                     {
                         flush(ByteBuffer.wrap(new byte[]{1}));
                         close();
