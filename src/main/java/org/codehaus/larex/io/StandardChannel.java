@@ -197,6 +197,7 @@ public class StandardChannel implements Channel
                     break;
                 case INPUT_OUTPUT:
                     close();
+                    break;
                 default:
                     throw new IllegalStateException();
             }
