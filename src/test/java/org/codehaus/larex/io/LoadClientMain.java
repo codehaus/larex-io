@@ -60,9 +60,9 @@ public class LoadClientMain
         int maxThreads = 500;
         ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
-        Scheduler scheduler = new StandardScheduler();
 
-        ClientConnector connector = new ClientConnector(threadPool, scheduler);
+        ClientConnector connector = new ClientConnector(threadPool);
+        connector.open();
 
         Random random = new Random();
 
@@ -335,7 +335,7 @@ public class LoadClientMain
         }
 
         @Override
-        protected void onRead(ByteBuffer buffer)
+        protected boolean onRead(ByteBuffer buffer)
         {
             while (buffer.hasRemaining())
             {
@@ -361,6 +361,7 @@ public class LoadClientMain
                     }
                 }
             }
+            return true;
         }
 
         public void send(byte[] content)

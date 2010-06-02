@@ -49,7 +49,7 @@ public class SSLServerConnectorTest extends AbstractTestCase
     public int initServerConnector(ConnectionFactory connectionFactory) throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        connector = new SSLServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
+        connector = new SSLServerConnector(address, connectionFactory, getThreadPool());
         connector.setKeyStoreResource("keystore");
         connector.setKeyStorePassword("storepwd");
         connector.setKeyPassword("keypwd");

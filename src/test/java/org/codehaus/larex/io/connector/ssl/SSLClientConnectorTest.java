@@ -56,11 +56,12 @@ public class SSLClientConnectorTest extends AbstractTestCase
     @Before
     public void initClientConnector() throws Exception
     {
-        clientConnector = new SSLClientConnector(getThreadPool(), getScheduler());
+        clientConnector = new SSLClientConnector(getThreadPool());
         clientConnector.setKeyStoreResource("keystore");
         clientConnector.setKeyStorePassword("storepwd");
         clientConnector.setKeyPassword("keypwd");
         clientConnector.setTrustStoreResource("truststore");
+        clientConnector.open();
     }
 
     @After
@@ -229,10 +230,11 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(controller)
                     {
                         @Override
-                        public void onRead(ByteBuffer buffer)
+                        public boolean onRead(ByteBuffer buffer)
                         {
                             assertEquals(serverMessage, Charset.forName("UTF-8").decode(buffer).toString());
                             readLatch.countDown();
+                            return true;
                         }
 
                         @Override
@@ -398,11 +400,12 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(controller)
                     {
                         @Override
-                        protected void onRead(ByteBuffer buffer)
+                        protected boolean onRead(ByteBuffer buffer)
                         {
                             bytesCount.addAndGet(buffer.remaining());
                             if (bytesCount.get() == content.length())
                                 clientLatch.countDown();
+                            return true;
                         }
                     };
                 }
@@ -431,35 +434,43 @@ public class SSLClientConnectorTest extends AbstractTestCase
     public void testHandshakeWithExternalSite() throws Exception
     {
         final CountDownLatch latch = new CountDownLatch(1);
-        SSLClientConnector connector = new SSLClientConnector(getThreadPool(), getScheduler());
-        StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+        // Use a SSL connector not configured with the test keystore
+        SSLClientConnector connector = new SSLClientConnector(getThreadPool());
+        connector.open();
+        try
         {
-            public StandardConnection newConnection(Controller controller)
+            StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
             {
-                return new StandardConnection(controller)
+                public StandardConnection newConnection(Controller controller)
                 {
-                    @Override
-                    protected void onRead(ByteBuffer buffer)
+                    return new StandardConnection(controller)
                     {
-                        String response = Charset.forName("UTF-8").decode(buffer).toString();
-                        if (Pattern.compile("<html>", Pattern.CASE_INSENSITIVE).matcher(response).find())
-                            latch.countDown();
-                    }
-                };
-            }
-        }).connect(new InetSocketAddress("mail.google.com", 443));
+                        @Override
+                        protected boolean onRead(ByteBuffer buffer)
+                        {
+                            String response = Charset.forName("UTF-8").decode(buffer).toString();
+                            if (Pattern.compile("<html>", Pattern.CASE_INSENSITIVE).matcher(response).find())
+                                latch.countDown();
+                            return true;
+                        }
+                    };
+                }
+            }).connect(new InetSocketAddress("mail.google.com", 443));
 
-        assertTrue(connection.awaitReady(1000));
+            assertTrue(connection.awaitReady(1000));
 
-        String request = "" +
-                "GET / HTTP/1.1\r\n" +
-                "Host: mail.google.com:443\r\n" +
-                "\r\n";
+            String request = "" +
+                    "GET / HTTP/1.1\r\n" +
+                    "Host: mail.google.com:443\r\n" +
+                    "\r\n";
 
-        connection.flush(Charset.forName("UTF-8").encode(request));
-        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
-
-        connector.close();
-        connector.join(1000);
+            connection.flush(Charset.forName("UTF-8").encode(request));
+            assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+        }
+        finally
+        {
+            connector.close();
+            connector.join(1000);
+        }
     }
 }

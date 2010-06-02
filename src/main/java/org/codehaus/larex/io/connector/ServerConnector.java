@@ -26,18 +26,17 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.larex.io.ByteBuffers;
+import org.codehaus.larex.io.CachedByteBuffers;
 import org.codehaus.larex.io.Channel;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Coordinator;
-import org.codehaus.larex.io.ReadWriteSelector;
 import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.StandardChannel;
-import org.codehaus.larex.io.ThreadLocalByteBuffers;
 import org.codehaus.larex.io.TimeoutCoordinator;
+import org.codehaus.larex.io.TimeoutReadWriteSelector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,13 +45,14 @@ import org.slf4j.LoggerFactory;
  */
 public class ServerConnector
 {
+    private static final AtomicInteger ids = new AtomicInteger();
+
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final InetSocketAddress address;
     private final ConnectionFactory connectionFactory;
     private final Executor threadPool;
-    private final Scheduler scheduler;
-    private final ByteBuffers byteBuffers;
     private final AtomicInteger selectorIndex = new AtomicInteger();
+    private volatile ByteBuffers byteBuffers;
     private volatile int selectorCount = 1;
     private volatile Selector[] selectors;
     private volatile int acceptorCount = 1;
@@ -63,28 +63,21 @@ public class ServerConnector
     private volatile long writeTimeout = 0;
     private volatile ServerSocketChannel serverChannel;
 
-    public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
+    public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool)
     {
         this.address = address;
         this.connectionFactory = connectionFactory;
         this.threadPool = threadPool;
-        this.scheduler = scheduler;
-        this.byteBuffers = newByteBuffers();
     }
 
     protected ByteBuffers newByteBuffers()
     {
-        return new ThreadLocalByteBuffers();
+        return new CachedByteBuffers();
     }
 
     public Executor getThreadPool()
     {
         return threadPool;
-    }
-
-    public Scheduler getScheduler()
-    {
-        return scheduler;
     }
 
     protected ByteBuffers getByteBuffers()
@@ -171,6 +164,8 @@ public class ServerConnector
             throw new RuntimeIOException(x);
         }
 
+        this.byteBuffers = newByteBuffers();
+
         this.selectors = new Selector[getSelectorCount()];
         for (int i = 0; i < selectors.length; ++i)
             this.selectors[i] = newSelector();
@@ -189,12 +184,14 @@ public class ServerConnector
 
     protected Selector newSelector()
     {
-        return new ReadWriteSelector();
+        TimeoutReadWriteSelector selector = new TimeoutReadWriteSelector();
+        selector.open();
+        return selector;
     }
 
     protected Thread newAcceptorThread(Runnable acceptor)
     {
-        return new Thread(acceptor, getClass().getSimpleName() + "-Acceptor");
+        return new Thread(acceptor, "Acceptor-" + ids.incrementAndGet());
     }
 
     public void close()
@@ -233,6 +230,41 @@ public class ServerConnector
         return result;
     }
 
+    protected void accept()
+    {
+        while (serverChannel.isOpen())
+        {
+            try
+            {
+                // Do not use the selector for accept() operation, as it is more expensive
+                // (for each new connection needs to return from select, and then accept())
+                SocketChannel socketChannel = serverChannel.accept();
+
+                // If this server connector is closed but this thread is still active
+                // we should avoid processing the connection
+                if (serverChannel.isOpen())
+                {
+                    logger.debug("ServerConnector {}, accepted socket {}", this, socketChannel);
+                    accepted(socketChannel);
+                }
+            }
+            catch (SocketTimeoutException x)
+            {
+                logger.debug("ServerConnector {}, ignoring timeout during accept", this);
+            }
+            catch (AsynchronousCloseException x)
+            {
+                logger.debug("ServerConnector {} closed asynchronously", this);
+                break;
+            }
+            catch (IOException x)
+            {
+                close();
+                throw new RuntimeIOException(x);
+            }
+        }
+    }
+
     protected void accepted(SocketChannel socketChannel) throws IOException
     {
         socketChannel.configureBlocking(false);
@@ -259,7 +291,7 @@ public class ServerConnector
 
     protected Coordinator newCoordinator(Selector selector)
     {
-        return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
     }
 
     protected Channel newChannel(SocketChannel channel, Controller controller)
@@ -281,41 +313,10 @@ public class ServerConnector
     {
         public void run()
         {
+            logger.debug("ServerConnector {}, acceptor loop entered", this);
             try
             {
-                logger.debug("ServerConnector {}, acceptor loop entered", this);
-
-                while (serverChannel.isOpen())
-                {
-                    try
-                    {
-                        // Do not use the selector for accept() operation, as it is more expensive
-                        // (for each new connection needs to return from select, and then accept())
-                        SocketChannel socketChannel = serverChannel.accept();
-
-                        // If this server connector is closed but this thread is still active
-                        // we should avoid processing the connection
-                        if (serverChannel.isOpen())
-                        {
-                            logger.debug("ServerConnector {}, accepted socket {}", this, socketChannel);
-                            accepted(socketChannel);
-                        }
-                    }
-                    catch (SocketTimeoutException x)
-                    {
-                        logger.debug("ServerConnector {}, ignoring timeout during accept", this);
-                    }
-                    catch (AsynchronousCloseException x)
-                    {
-                        logger.debug("ServerConnector {} closed asynchronously", this);
-                        break;
-                    }
-                    catch (IOException x)
-                    {
-                        close();
-                        throw new RuntimeIOException(x);
-                    }
-                }
+                accept();
             }
             finally
             {

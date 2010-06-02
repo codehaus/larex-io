@@ -41,7 +41,7 @@ public class StandardClientConnectorTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch acceptLatch = new CountDownLatch(1);
-        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool())
         {
             @Override
             protected void accepted(SocketChannel socketChannel) throws IOException
@@ -55,33 +55,43 @@ public class StandardClientConnectorTest extends AbstractTestCase
         try
         {
             final CountDownLatch responseLatch = new CountDownLatch(1);
-            ClientConnector clientConnector = new ClientConnector(getThreadPool(), getScheduler());
-            Endpoint<StandardConnection> endpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
-            {
-                public StandardConnection newConnection(Controller controller)
-                {
-                    return new StandardConnection(controller)
-                    {
-                        @Override
-                        protected void onRead(ByteBuffer buffer)
-                        {
-                            responseLatch.countDown();
-                        }
-                    };
-                }
-            });
-
-            StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-            assertTrue(connection.awaitReady(1000));
+            ClientConnector clientConnector = new ClientConnector(getThreadPool());
+            clientConnector.open();
             try
             {
-                assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));
-                connection.flush(ByteBuffer.wrap(new byte[]{1}));
-                assertTrue(responseLatch.await(1000, TimeUnit.MILLISECONDS));
+                Endpoint<StandardConnection> endpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
+                {
+                    public StandardConnection newConnection(Controller controller)
+                    {
+                        return new StandardConnection(controller)
+                        {
+                            @Override
+                            protected boolean onRead(ByteBuffer buffer)
+                            {
+                                responseLatch.countDown();
+                                return true;
+                            }
+                        };
+                    }
+                });
+
+                StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+                assertTrue(connection.awaitReady(1000));
+                try
+                {
+                    assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));
+                    connection.flush(ByteBuffer.wrap(new byte[]{1}));
+                    assertTrue(responseLatch.await(1000, TimeUnit.MILLISECONDS));
+                }
+                finally
+                {
+                    connection.softClose(1000);
+                }
             }
             finally
             {
-                connection.softClose(1000);
+                clientConnector.close();
+                clientConnector.join(1000);
             }
         }
         finally

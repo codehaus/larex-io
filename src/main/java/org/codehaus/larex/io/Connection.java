@@ -49,8 +49,9 @@ public interface Connection
     /**
      * <p>Callback method called when this connection has read bytes sent from the remote peer.</p>
      * @param buffer the buffer containing the bytes read
+     * @return whether to be notified of future read events or not
      */
-    void readEvent(ByteBuffer buffer);
+    boolean readEvent(ByteBuffer buffer);
 
     /**
      * <p>Callback method called when this connection times out while waiting to read bytes.<p>

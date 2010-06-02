@@ -37,12 +37,17 @@ public class EchoServerMain
         ThreadPoolExecutor threadPool = new ThreadPoolExecutor(maxThreads, maxThreads, 60L, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(), new CallerBlocksPolicy());
 //        threadPool.prestartAllCoreThreads();
+//        Executor threadPool = new Executor()
+//        {
+//            public void execute(Runnable command)
+//            {
+//                command.run();
+//            }
+//        };
 
         InetSocketAddress address = new InetSocketAddress(InetAddress.getByName(null), 8080);
 
-        Scheduler scheduler = new StandardScheduler();
-
-        ServerConnector connector = new ServerConnector(address, new EchoConnection.Factory(), threadPool, scheduler);
+        ServerConnector connector = new ServerConnector(address, new EchoConnection.Factory(), threadPool);
 //        connector.setReadTimeout(10 * 60 * 1000L);
         connector.setAcceptorCount(1);
         connector.setSelectorCount(1);

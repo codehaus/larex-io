@@ -37,7 +37,6 @@ import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.connector.ServerConnector;
 import org.codehaus.larex.io.ssl.SSLInterceptor;
 
@@ -60,10 +59,10 @@ public class SSLServerConnector extends ServerConnector
     private volatile String secureRandomAlgorithm = "SHA1PRNG";
     private volatile SSLContext sslContext;
 
-    public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool, Scheduler scheduler)
+    public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool)
     {
-        super(address, connectionFactory, threadPool, scheduler);
-        this.sslByteBuffers = newSSLByteBuffers();
+        super(address, connectionFactory, threadPool);
+        this.sslByteBuffers = newSSLByteBuffers(); // TODO: not from here: override listen()
     }
 
     protected ByteBuffers newSSLByteBuffers()

@@ -28,7 +28,7 @@ import java.nio.ByteBuffer;
  */
 public abstract class FlushableConnection extends ClosableConnection
 {
-    private final Flusher flusher;
+    private final BlockingFlusher flusher;
 
     protected FlushableConnection(Controller controller)
     {
@@ -97,7 +97,7 @@ public abstract class FlushableConnection extends ClosableConnection
         return getController().write(buffer);
     }
 
-    private class ConnectionFlusher extends Flusher
+    private class ConnectionFlusher extends BlockingFlusher
     {
         private ConnectionFlusher(Controller controller)
         {

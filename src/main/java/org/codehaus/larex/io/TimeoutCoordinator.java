@@ -21,80 +21,93 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
+ * TODO: adding a task for timeouts is expensive for 20k connections
+ * If all connections gets created at same time, there are 20k tasks running at the same time
+ * Coalesce ? Or have one static task that runs over all coordinators ?
+ *
  * @version $Revision$ $Date$
  */
 public class TimeoutCoordinator extends StandardCoordinator
 {
-    private final Scheduler scheduler;
+    private final AtomicReference<State> readState = new AtomicReference<State>(State.WAIT);
+    private final AtomicReference<State> writeState = new AtomicReference<State>(State.WAIT);
     private final long readTimeout;
     private final long writeTimeout;
-    private final Scheduler.Task readTimeoutTask;
-    private final Scheduler.Task writeTimeoutTask;
-    private final AtomicReference<ReadState> readState = new AtomicReference<ReadState>(ReadState.WAIT);
+    private volatile long readTime;
+    private volatile long writeTime;
 
-    public TimeoutCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler, long readTimeout, long writeTimeout)
+    public TimeoutCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, long readTimeout, long writeTimeout)
     {
         super(selector, byteBuffers, threadPool);
-        this.scheduler = scheduler;
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;
+    }
 
-        final Runnable onReadTimeout = new Runnable()
+    public void timeoutRead()
+    {
+        long readTime = this.readTime;
+        if (readTime != 0L)
         {
-            public void run()
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - readTime);
+            if (elapsed > readTimeout)
             {
-                onReadTimeout();
+                getThreadPool().execute(new Runnable()
+                {
+                    public void run()
+                    {
+                        onReadTimeout();
+                    }
+                });
             }
-        };
-        this.readTimeoutTask = scheduler.newTask(new Runnable()
-        {
-            public void run()
-            {
-                getThreadPool().execute(onReadTimeout);
-            }
-        });
+        }
+    }
 
-        final Runnable onWriteTimeout = new Runnable()
+    public void timeoutWrite()
+    {
+        long writeTime = this.writeTime;
+        if (writeTime != 0L)
         {
-            public void run()
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - writeTime);
+            if (elapsed > writeTimeout)
             {
-                onWriteTimeout();
+                getThreadPool().execute(new Runnable()
+                {
+                    public void run()
+                    {
+                        onWriteTimeout();
+                    }
+                });
             }
-        };
-        this.writeTimeoutTask = scheduler.newTask(new Runnable()
-        {
-            public void run()
-            {
-                getThreadPool().execute(onWriteTimeout);
-            }
-        });
+        }
     }
 
     @Override
     public void onReadReady()
     {
-        scheduler.cancel(readTimeoutTask);
+        readTime = 0L;
         super.onReadReady();
+    }
+
+    @Override
+    public void needsRead(boolean needsRead)
+    {
+        if (needsRead)
+            readTime = now();
+        super.needsRead(needsRead);
     }
 
     @Override
     public void onWriteReady()
     {
-        scheduler.cancel(writeTimeoutTask);
+        writeTime = 0L;
         super.onWriteReady();
     }
 
-    public void needsRead(boolean needsRead)
-    {
-        if (needsRead && readTimeout > 0)
-            scheduler.schedule(readTimeoutTask, readTimeout, TimeUnit.MILLISECONDS);
-        super.needsRead(needsRead);
-    }
-
+    @Override
     public void needsWrite(boolean needsWrite)
     {
-        if (needsWrite && writeTimeout > 0)
-            scheduler.schedule(writeTimeoutTask, writeTimeout, TimeUnit.MILLISECONDS);
+        if (needsWrite)
+            writeTime = now();
         super.needsWrite(needsWrite);
     }
 
@@ -102,7 +115,7 @@ public class TimeoutCoordinator extends StandardCoordinator
     protected void onReadAction()
     {
         // Notify reads in any case, even if we could not change the state
-        boolean reading = readState.compareAndSet(ReadState.WAIT, ReadState.READ);
+        boolean reading = readState.compareAndSet(State.WAIT, State.ACTIVE);
         try
         {
             super.onReadAction();
@@ -110,14 +123,14 @@ public class TimeoutCoordinator extends StandardCoordinator
         finally
         {
             if (reading)
-                readState.compareAndSet(ReadState.READ, ReadState.WAIT);
+                readState.compareAndSet(State.ACTIVE, State.WAIT);
         }
     }
 
     protected void onReadTimeout()
     {
-        // Skip notification of read timeout in case a concurrent read happens
-        if (readState.compareAndSet(ReadState.WAIT, ReadState.TIMEOUT))
+        // Skip notification of read timeout in case a concurrent read event happens
+        if (readState.compareAndSet(State.WAIT, State.TIMEOUT))
         {
             try
             {
@@ -125,18 +138,50 @@ public class TimeoutCoordinator extends StandardCoordinator
             }
             finally
             {
-                readState.compareAndSet(ReadState.TIMEOUT, ReadState.WAIT);
+                readState.compareAndSet(State.TIMEOUT, State.WAIT);
             }
+        }
+    }
+
+    @Override
+    protected void onWriteAction()
+    {
+        // Notify writes in any case, even if we could not change the state
+        boolean writing = writeState.compareAndSet(State.WAIT, State.ACTIVE);
+        try
+        {
+            super.onWriteAction();
+        }
+        finally
+        {
+            if (writing)
+                writeState.compareAndSet(State.ACTIVE, State.WAIT);
         }
     }
 
     protected void onWriteTimeout()
     {
-        getInterceptor().onWriteTimeout();
+        // Skip notification of write timeout in case a concurrent write event happens
+        if (writeState.compareAndSet(State.WAIT, State.TIMEOUT))
+        {
+            try
+            {
+                getInterceptor().onWriteTimeout();
+            }
+            finally
+            {
+                writeState.compareAndSet(State.TIMEOUT, State.WAIT);
+            }
+        }
     }
 
-    private enum ReadState
+    private long now()
     {
-        WAIT, READ, TIMEOUT
+        return System.nanoTime();
+    }
+
+    private enum State
+    {
+        WAIT, ACTIVE, TIMEOUT
     }
 }

@@ -42,7 +42,7 @@ public class ServerReadsZeroTest extends AbstractTestCase
         final CountDownLatch needReads = new CountDownLatch(5);
         final CountDownLatch reads = new CountDownLatch(1);
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool())
         {
             @Override
             protected Channel newChannel(SocketChannel channel, Controller controller)
@@ -73,10 +73,11 @@ public class ServerReadsZeroTest extends AbstractTestCase
                 return new StandardCoordinator(selector, getByteBuffers(), getThreadPool())
                 {
                     @Override
-                    protected void onRead(ByteBuffer buffer)
+                    protected boolean onRead(ByteBuffer buffer)
                     {
                         super.onRead(buffer);
                         reads.countDown();
+                        return true;
                     }
 
                     public void needsRead(boolean needsRead)
@@ -91,30 +92,39 @@ public class ServerReadsZeroTest extends AbstractTestCase
 
         try
         {
-            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
-            StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-            assertTrue(connection.awaitReady(1000));
+            ClientConnector connector = new ClientConnector(getThreadPool());
+            connector.open();
             try
             {
-                ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
-                connection.flush(buffer);
-                assertTrue(reads.await(1000, TimeUnit.MILLISECONDS));
+                Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
+                StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+                assertTrue(connection.awaitReady(1000));
+                try
+                {
+                    ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
+                    connection.flush(buffer);
+                    assertTrue(reads.await(1000, TimeUnit.MILLISECONDS));
 
-                // Five needsRead calls: at beginning to enable the reads, then to disable;
-                // after reading 0 to re-enable the reads, and again to disable;
-                // then to re-enable them
-                assertTrue(needReads.await(1000, TimeUnit.MILLISECONDS));
+                    // Five needsRead calls: at beginning to enable the reads, then to disable;
+                    // after reading 0 to re-enable the reads, and again to disable;
+                    // then to re-enable them
+                    assertTrue(needReads.await(1000, TimeUnit.MILLISECONDS));
+                }
+                finally
+                {
+                    connection.softClose(1000);
+                }
             }
             finally
             {
-                connection.softClose(1000);
+                connector.close();
+                connector.join(1000);
             }
         }
         finally
         {
             serverConnector.close();
-            serverConnector.join(1000L);
+            serverConnector.join(1000);
         }
     }
 }

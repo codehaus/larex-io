@@ -56,56 +56,74 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                 };
             }
         };
-        ServerConnector serverConnector = new ServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, connectionFactory, getThreadPool());
         int port = serverConnector.listen();
-        ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
+        try
         {
-            @Override
-            public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
+            ClientConnector connector = new ClientConnector(getThreadPool())
             {
-                return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler())
+                @Override
+                public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
                 {
-                    @Override
-                    protected void register(Channel channel, Selector.Listener listener)
+                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool())
                     {
-                        try
+                        @Override
+                        protected void register(Channel channel, Selector.Listener listener)
                         {
-                            serverConnectionLatch.await(1, TimeUnit.SECONDS);
-                            StandardConnection connection = serverConnection.get();
-                            connection.flush(ByteBuffer.wrap(new byte[]{1}));
-                            connection.close();
-                            Thread.sleep(500);
-                            super.register(channel, listener);
+                            try
+                            {
+                                serverConnectionLatch.await(1, TimeUnit.SECONDS);
+                                StandardConnection connection = serverConnection.get();
+                                connection.flush(ByteBuffer.wrap(new byte[]{1}));
+                                connection.close();
+                                Thread.sleep(500);
+                                super.register(channel, listener);
+                            }
+                            catch (InterruptedException x)
+                            {
+                                throw new RuntimeIOException(x);
+                            }
                         }
-                        catch (InterruptedException x)
-                        {
-                            throw new RuntimeIOException(x);
-                        }
-                    }
-                };
-            }
-        };
-        final CountDownLatch latch = new CountDownLatch(2);
-        connector.newEndpoint(new ConnectionFactory<StandardConnection>()
-        {
-            public StandardConnection newConnection(Controller controller)
+                    };
+                }
+            };
+            connector.open();
+            try
             {
-                return new StandardConnection(controller)
+                final CountDownLatch latch = new CountDownLatch(2);
+                connector.newEndpoint(new ConnectionFactory<StandardConnection>()
                 {
-                    @Override
-                    protected void onRead(ByteBuffer buffer)
+                    public StandardConnection newConnection(Controller controller)
                     {
-                        latch.countDown();
-                    }
+                        return new StandardConnection(controller)
+                        {
+                            @Override
+                            protected boolean onRead(ByteBuffer buffer)
+                            {
+                                latch.countDown();
+                                return true;
+                            }
 
-                    @Override
-                    public void onRemoteClose()
-                    {
-                        latch.countDown();
+                            @Override
+                            public void onRemoteClose()
+                            {
+                                latch.countDown();
+                            }
+                        };
                     }
-                };
+                }).connect(new InetSocketAddress("localhost", port));
+                assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
             }
-        }).connect(new InetSocketAddress("localhost", port));
-        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+            finally
+            {
+                connector.close();
+                connector.join(1000);
+            }
+        }
+        finally
+        {
+            serverConnector.close();
+            serverConnector.join(1000);
+        }
     }
 }

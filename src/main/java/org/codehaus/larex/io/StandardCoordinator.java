@@ -199,11 +199,13 @@ public class StandardCoordinator implements Coordinator
     {
         int read;
         boolean closed;
+        boolean readMore = true;
         int readBufferSize = getReadBufferSize();
         ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, false);
         try
         {
-            // The buffer can be smaller than the data available, so read until we cannot read anymore.
+            // The buffer can be smaller than the data available,
+            // therefore we read until we cannot read anymore.
             while (true)
             {
                 int start = buffer.position();
@@ -215,12 +217,12 @@ public class StandardCoordinator implements Coordinator
                     if (logger.isDebugEnabled())
                         logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
                     buffer.flip();
-                    onRead(buffer);
+                    readMore = onRead(buffer);
                     buffer.clear();
                     buffer.limit(readBufferSize);
                 }
 
-                if (read == 0 || closed)
+                if (!readMore || read == 0 || closed)
                     break;
             }
         }
@@ -231,23 +233,13 @@ public class StandardCoordinator implements Coordinator
 
         if (closed)
         {
-            // TODO: improve this: the if statement may not be needed
-            if (!getChannel().isClosed(StreamType.INPUT))
-            {
-                if (logger.isDebugEnabled())
-                    logger.debug("Channel {} closed remotely", getChannel());
-                onRemoteClose();
-            }
-            else
-            {
-                // Input was explicitly closed
-                throw new RuntimeSocketClosedException();
-            }
+            if (logger.isDebugEnabled())
+                logger.debug("Channel {} closed remotely", getChannel());
+            onRemoteClose();
         }
         else
         {
-            // We read 0 bytes, we need to re-register for read interest
-            needsRead(true);
+            needsRead(readMore);
         }
     }
 
@@ -261,16 +253,9 @@ public class StandardCoordinator implements Coordinator
         close(StreamType.INPUT_OUTPUT);
     }
 
-    protected void onRead(ByteBuffer buffer)
+    protected boolean onRead(ByteBuffer buffer)
     {
-        try
-        {
-            getInterceptor().onRead(buffer);
-        }
-        catch (Exception x)
-        {
-            logger.info("Unexpected exception", x);
-        }
+        return getInterceptor().onRead(buffer);
     }
 
     protected Interceptor getInterceptor()
@@ -376,15 +361,16 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
-        public void onRead(ByteBuffer buffer)
+        public boolean onRead(ByteBuffer buffer)
         {
             try
             {
-                getConnection().readEvent(buffer);
+                return getConnection().readEvent(buffer);
             }
             catch (Exception x)
             {
                 logger.debug("Unexpected exception", x);
+                return true;
             }
         }
 
@@ -455,6 +441,7 @@ public class StandardCoordinator implements Coordinator
 
         public void close(StreamType type)
         {
+            getSelector().unregister(getChannel(), StandardCoordinator.this);
             getChannel().close(type);
         }
     }

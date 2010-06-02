@@ -21,9 +21,9 @@ import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 
+import org.codehaus.larex.io.BlockingFlusher;
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Controller;
-import org.codehaus.larex.io.Flusher;
 import org.codehaus.larex.io.Interceptor;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
@@ -109,7 +109,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public void onRead(ByteBuffer sslBuffer)
+    public boolean onRead(ByteBuffer sslBuffer)
     {
         logger.debug("Reading {}", sslBuffer);
         int bufferSize = sslEngine.getSession().getApplicationBufferSize();
@@ -150,10 +150,10 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 }
             }
 
-            if (!handshaking)
-            {
-                wrap(sslBuffer, buffer);
-            }
+            if (handshaking)
+                return true;
+
+            return wrap(sslBuffer, buffer);
         }
         catch (SSLException x)
         {
@@ -166,8 +166,9 @@ public class SSLInterceptor extends Interceptor.Forwarder
         }
     }
 
-    private void wrap(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
+    private boolean wrap(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
     {
+        boolean readMore = true;
         int bufferSize = sslEngine.getSession().getApplicationBufferSize();
         out: while (sslBuffer.hasRemaining())
         {
@@ -183,13 +184,18 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     // Prepare for read
                     buffer.flip();
                     // Forward the call with the unencrypted bytes
-                    super.onRead(buffer);
+                    readMore = super.onRead(buffer);
                     // Cleanup the buffer
                     buffer.clear();
                     buffer.limit(bufferSize);
                     // Cleanup the SSL buffer
                     resetLocal();
-                    break;
+
+                    // TODO: check this: I don't think we are behaving properly if readMore==false
+                    if (readMore)
+                        break;
+                    else
+                        break out;
                 }
                 case BUFFER_UNDERFLOW:
                 {
@@ -205,6 +211,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     throw new IllegalStateException();
             }
         }
+        return readMore;
     }
 
     private void prepareLocal(ByteBuffer sslBuffer)
@@ -453,7 +460,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         super.onClosing(type);
     }
 
-    private class SSLFlusher extends Flusher
+    private class SSLFlusher extends BlockingFlusher
     {
         private SSLFlusher(Controller controller)
         {

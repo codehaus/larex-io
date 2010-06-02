@@ -39,7 +39,7 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch registerLatch = new CountDownLatch(1);
-        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool())
         {
             @Override
             protected Channel newChannel(SocketChannel channel, Controller controller)
@@ -73,39 +73,48 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
         try
         {
             final CountDownLatch closeLatch = new CountDownLatch(1);
-            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            ClientConnector connector = new ClientConnector(getThreadPool());
+            connector.open();
+            try
             {
-                public StandardConnection newConnection(Controller controller)
+                Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
                 {
-                    return new StandardConnection(controller)
+                    public StandardConnection newConnection(Controller controller)
                     {
-                        @Override
-                        public void onRemoteClose()
+                        return new StandardConnection(controller)
                         {
-                            closeLatch.countDown();
-                        }
-                    };
-                }
-            });
-            endpoint.connect(new InetSocketAddress("localhost", port));
+                            @Override
+                            public void onRemoteClose()
+                            {
+                                closeLatch.countDown();
+                            }
+                        };
+                    }
+                });
+                endpoint.connect(new InetSocketAddress("localhost", port));
 
-            // Wait for the Selector to register the channel
-            assertTrue(registerLatch.await(1000, TimeUnit.MILLISECONDS));
+                // Wait for the Selector to register the channel
+                assertTrue(registerLatch.await(1000, TimeUnit.MILLISECONDS));
 
-            // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).
-            // Calling socket.isClosed() yields false, socket.isConnected() yields true, so no help.
-            // Writing on the output stream causes a RST from the server, but this may not be converted to
-            // a SocketException("Broken Pipe") depending on the TCP buffers on the OS, I think.
-            // If the write is big enough, eventually SocketException("Broken Pipe") is raised.
-            // The only reliable way is to read and check if we get -1.
+                // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).
+                // Calling socket.isClosed() yields false, socket.isConnected() yields true, so no help.
+                // Writing on the output stream causes a RST from the server, but this may not be converted to
+                // a SocketException("Broken Pipe") depending on the TCP buffers on the OS, I think.
+                // If the write is big enough, eventually SocketException("Broken Pipe") is raised.
+                // The only reliable way is to read and check if we get -1.
 
-            assertTrue(closeLatch.await(1000, TimeUnit.MILLISECONDS));
+                assertTrue(closeLatch.await(1000, TimeUnit.MILLISECONDS));
+            }
+            finally
+            {
+                connector.close();
+                connector.join(1000);
+            }
         }
         finally
         {
             serverConnector.close();
-            serverConnector.join(1000L);
+            serverConnector.join(1000);
         }
     }
 }

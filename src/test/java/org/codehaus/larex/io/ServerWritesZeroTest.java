@@ -45,7 +45,7 @@ public class ServerWritesZeroTest extends AbstractTestCase
         final AtomicInteger needWrites = new AtomicInteger();
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
-        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool())
         {
             @Override
             protected Channel newChannel(SocketChannel channel, Controller controller)
@@ -103,33 +103,42 @@ public class ServerWritesZeroTest extends AbstractTestCase
 
         try
         {
-            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
-            StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-            assertTrue(connection.awaitReady(1000));
+            ClientConnector connector = new ClientConnector(getThreadPool());
+            connector.open();
             try
             {
-                ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
-                connection.flush(buffer);
+                Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
+                StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+                assertTrue(connection.awaitReady(1000));
+                try
+                {
+                    ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
+                    connection.flush(buffer);
 
-                assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                    assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 
-                // Three write calls from the connection
-                assertEquals(3, writes.get());
-                // Four needsWrite calls:
-                // after writing 0 bytes to enable the writes, then to disable;
-                // after writing 1 byte to enable the writes, then to disable
-                assertEquals(4, needWrites.get());
+                    // Three write calls from the connection
+                    assertEquals(3, writes.get());
+                    // Four needsWrite calls:
+                    // after writing 0 bytes to enable the writes, then to disable;
+                    // after writing 1 byte to enable the writes, then to disable
+                    assertEquals(4, needWrites.get());
+                }
+                finally
+                {
+                    connection.softClose(1000);
+                }
             }
             finally
             {
-                connection.softClose(1000);
+                connector.close();
+                connector.join(1000);
             }
         }
         finally
         {
             serverConnector.close();
-            serverConnector.join(1000L);
+            serverConnector.join(1000);
         }
     }
 }

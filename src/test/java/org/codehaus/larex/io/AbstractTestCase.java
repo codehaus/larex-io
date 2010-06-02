@@ -32,20 +32,16 @@ public abstract class AbstractTestCase
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private volatile ExecutorService threadPool;
-    private volatile Scheduler scheduler;
 
     @Before
     public void init()
     {
         threadPool = Executors.newCachedThreadPool();
-        scheduler = new StandardScheduler();
     }
 
     @After
     public void destroy() throws Exception
     {
-        scheduler.shutdown();
-        scheduler.join(1000);
         threadPool.shutdown();
         threadPool.awaitTermination(1000, TimeUnit.MILLISECONDS);
     }
@@ -53,10 +49,5 @@ public abstract class AbstractTestCase
     public ExecutorService getThreadPool()
     {
         return threadPool;
-    }
-
-    public Scheduler getScheduler()
-    {
-        return scheduler;
     }
 }

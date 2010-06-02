@@ -33,7 +33,6 @@ import org.codehaus.larex.io.CachedByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.connector.ClientConnector;
 
 /**
@@ -41,7 +40,7 @@ import org.codehaus.larex.io.connector.ClientConnector;
  */
 public class SSLClientConnector extends ClientConnector
 {
-    private final ByteBuffers sslByteBuffers;
+    private volatile ByteBuffers sslByteBuffers;
     private volatile String protocolAlgorithm = "SSLv3";
     private volatile String keyStoreType = "JKS";
     private volatile String keyStoreResource = null;
@@ -55,14 +54,15 @@ public class SSLClientConnector extends ClientConnector
     private volatile String secureRandomAlgorithm = "SHA1PRNG";
     private volatile SSLContext sslContext;
 
-    public SSLClientConnector(Executor threadPool, Scheduler scheduler)
+    public SSLClientConnector(Executor threadPool)
     {
-        this(threadPool, scheduler, 1);
+       super(threadPool);
     }
 
-    public SSLClientConnector(Executor threadPool, Scheduler scheduler, int selectors)
+    @Override
+    public void open()
     {
-        super(threadPool, scheduler, selectors);
+        super.open();
         this.sslByteBuffers = newSSLByteBuffers();
     }
 
@@ -78,7 +78,7 @@ public class SSLClientConnector extends ClientConnector
 
     public <C extends Connection> SSLEndpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
     {
-        return new SSLEndpoint<C>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getSSLContext(), getSSLByteBuffers());
+        return new SSLEndpoint<C>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getSSLContext(), getSSLByteBuffers());
     }
 
     public String getProtocolAlgorithm()

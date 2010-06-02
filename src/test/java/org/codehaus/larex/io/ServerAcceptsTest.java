@@ -39,7 +39,7 @@ public class ServerAcceptsTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
 
         final CountDownLatch latch = new CountDownLatch(1);
-        ServerConnector serverConnector = new ServerConnector(address, null, getThreadPool(), getScheduler())
+        ServerConnector serverConnector = new ServerConnector(address, null, getThreadPool())
         {
             @Override
             protected void accepted(SocketChannel socketChannel) throws IOException

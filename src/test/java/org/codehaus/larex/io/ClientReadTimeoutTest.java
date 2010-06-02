@@ -36,36 +36,56 @@ public class ClientReadTimeoutTest extends AbstractTestCase
     public void testReadTimeout() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool());
         int port = serverConnector.listen();
         try
         {
+            final long timerPeriod = 1000;
             final CountDownLatch timeoutLatch = new CountDownLatch(1);
-            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            ClientConnector connector = new ClientConnector(getThreadPool())
             {
-                public StandardConnection newConnection(Controller controller)
+                @Override
+                protected Selector newSelector()
                 {
-                    return new StandardConnection(controller)
-                    {
-                        @Override
-                        public void onReadTimeout()
-                        {
-                            timeoutLatch.countDown();
-                        }
-                    };
+                    TimeoutReadWriteSelector selector = new TimeoutReadWriteSelector();
+                    selector.setTimerPeriod(timerPeriod);
+                    selector.open();
+                    return selector;
                 }
-            });
-            int readTimeout = 1000;
-            endpoint.setReadTimeout(readTimeout);
-            StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+            };
+            connector.open();
             try
             {
-                assertTrue(timeoutLatch.await(readTimeout * 2, TimeUnit.MILLISECONDS));
+                Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+                {
+                    public StandardConnection newConnection(Controller controller)
+                    {
+                        return new StandardConnection(controller)
+                        {
+                            @Override
+                            public void onReadTimeout()
+                            {
+                                timeoutLatch.countDown();
+                            }
+                        };
+                    }
+                });
+                int readTimeout = 1000;
+                endpoint.setReadTimeout(readTimeout);
+                StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+                try
+                {
+                    assertTrue(timeoutLatch.await(readTimeout * 2 + timerPeriod, TimeUnit.MILLISECONDS));
+                }
+                finally
+                {
+                    connection.softClose(1000);
+                }
             }
             finally
             {
-                connection.softClose(1000);
+                connector.close();
+                connector.join(1000);
             }
         }
         finally

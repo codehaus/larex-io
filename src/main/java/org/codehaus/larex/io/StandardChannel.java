@@ -35,16 +35,14 @@ public class StandardChannel implements Channel
     private final boolean debug = logger.isDebugEnabled();
     private final SocketChannel channel;
     private final Controller controller;
-    private volatile int readAggressiveness;
-    private volatile int writeAggressiveness;
+    private volatile int readAggressiveness = 2;
+    private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
 
     public StandardChannel(SocketChannel channel, Controller controller)
     {
         this.channel = channel;
         this.controller = controller;
-        setReadAggressiveness(2);
-        setWriteAggressiveness(2);
     }
 
     public int getReadAggressiveness()

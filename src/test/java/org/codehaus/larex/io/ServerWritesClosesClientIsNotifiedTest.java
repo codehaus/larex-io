@@ -55,46 +55,64 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
             }
         };
 
-        ServerConnector serverConnector = new ServerConnector(address, connectionFactory, getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, connectionFactory, getThreadPool());
         int port = serverConnector.listen();
-
-        final AtomicInteger tester = new AtomicInteger();
-        final AtomicInteger failure = new AtomicInteger();
-        final CountDownLatch latch = new CountDownLatch(1);
-        ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler());
-        StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
-        {
-            public StandardConnection newConnection(Controller controller)
-            {
-                return new StandardConnection(controller)
-                {
-                    @Override
-                    protected void onRead(ByteBuffer buffer)
-                    {
-                        if (!tester.compareAndSet(0, 1))
-                            failure.set(1);
-                    }
-
-                    @Override
-                    public void onRemoteClose()
-                    {
-                        if (!tester.compareAndSet(1, 2))
-                            failure.set(2);
-                        latch.countDown();
-                    }
-                };
-            }
-        }).connect(new InetSocketAddress(address.getHostName(), port));
 
         try
         {
-            assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
-            assertEquals(2, tester.get());
-            assertEquals(0, failure.get());
+            final AtomicInteger tester = new AtomicInteger();
+            final AtomicInteger failure = new AtomicInteger();
+            final CountDownLatch latch = new CountDownLatch(1);
+            ClientConnector connector = new ClientConnector(getThreadPool());
+            connector.open();
+            try
+            {
+                StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+                    {
+                        public StandardConnection newConnection(Controller controller)
+                        {
+                            return new StandardConnection(controller)
+                            {
+                                @Override
+                                protected boolean onRead(ByteBuffer buffer)
+                                {
+                                    if (!tester.compareAndSet(0, 1))
+                                        failure.set(1);
+                                    return true;
+                                }
+
+                                @Override
+                                public void onRemoteClose()
+                                {
+                                    if (!tester.compareAndSet(1, 2))
+                                        failure.set(2);
+                                    latch.countDown();
+                                }
+                            };
+                        }
+                    }).connect(new InetSocketAddress(address.getHostName(), port));
+
+                try
+                    {
+                        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                        assertEquals(2, tester.get());
+                        assertEquals(0, failure.get());
+                    }
+                    finally
+                    {
+                        connection.close();
+                    }
+            }
+            finally
+            {
+                connector.close();
+                connector.join(1000);
+            }
         }
         finally
         {
-            connection.close();
+            serverConnector.close();
+            serverConnector.join(1000);
         }
     }
 }

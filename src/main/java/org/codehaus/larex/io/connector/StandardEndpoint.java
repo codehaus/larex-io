@@ -34,7 +34,6 @@ import org.codehaus.larex.io.Coordinator;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
 import org.codehaus.larex.io.RuntimeSocketTimeoutException;
-import org.codehaus.larex.io.Scheduler;
 import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.StandardChannel;
 import org.codehaus.larex.io.TimeoutCoordinator;
@@ -52,9 +51,8 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
     private final Selector selector;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
-    private final Scheduler scheduler;
 
-    public StandardEndpoint(ConnectionFactory<C> connectionFactory, Selector selector, ByteBuffers byteBuffers, Executor threadPool, Scheduler scheduler)
+    public StandardEndpoint(ConnectionFactory<C> connectionFactory, Selector selector, ByteBuffers byteBuffers, Executor threadPool)
     {
         try
         {
@@ -63,7 +61,6 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
             this.selector = selector;
             this.byteBuffers = byteBuffers;
             this.threadPool = threadPool;
-            this.scheduler = scheduler;
         }
         catch (IOException x)
         {
@@ -89,11 +86,6 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
     protected Executor getThreadPool()
     {
         return threadPool;
-    }
-
-    protected Scheduler getScheduler()
-    {
-        return scheduler;
     }
 
     @Override
@@ -162,7 +154,7 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
 
     protected Coordinator newCoordinator()
     {
-        return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
     }
 
     protected Channel newChannel(Controller controller)

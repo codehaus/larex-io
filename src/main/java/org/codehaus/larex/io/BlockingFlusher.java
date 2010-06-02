@@ -26,9 +26,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * TODO: have a threadless version of the flusher
  * @version $Revision$ $Date$
  */
-public abstract class Flusher
+public abstract class BlockingFlusher
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private final Lock flushLock = new ReentrantLock();
@@ -39,7 +40,7 @@ public abstract class Flusher
      */
     private FlushState flushState = FlushState.WRITE;
 
-    protected Flusher(Controller controller)
+    protected BlockingFlusher(Controller controller)
     {
         this.coordinator = controller;
     }
@@ -90,7 +91,7 @@ public abstract class Flusher
         }
     }
 
-    public void needsWrite()
+    private void needsWrite()
     {
         coordinator.needsWrite(true);
     }

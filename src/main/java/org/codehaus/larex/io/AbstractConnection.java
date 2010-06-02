@@ -51,18 +51,19 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void readEvent(ByteBuffer buffer)
+    public final boolean readEvent(ByteBuffer buffer)
     {
         doOnRead(buffer);
-        onRead(buffer);
+        return onRead(buffer);
     }
 
     void doOnRead(ByteBuffer buffer)
     {
     }
 
-    protected void onRead(ByteBuffer buffer)
+    protected boolean onRead(ByteBuffer buffer)
     {
+        return true;
     }
 
     public final void readTimeoutEvent()

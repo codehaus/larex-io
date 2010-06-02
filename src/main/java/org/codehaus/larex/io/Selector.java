@@ -32,6 +32,7 @@ public interface Selector
      *
      * @param channel  the channel to register
      * @param listener the listener to notify
+     * @see #unregister(Channel, Listener)
      */
     public void register(Channel channel, Listener listener);
 
@@ -44,6 +45,15 @@ public interface Selector
      * @param add        whether to add or remove the operations
      */
     public void update(Channel channel, int operations, boolean add);
+
+    /**
+     * <p>Disassociates the given {@code channel} from the given {@code listener}.</p>
+     *
+     * @param channel the channel to unregister
+     * @param listener the associated listener
+     * @see #register(Channel, Listener)
+     */
+    public void unregister(Channel channel, Listener listener);
 
     /**
      * <p>Closes this selector.</p>

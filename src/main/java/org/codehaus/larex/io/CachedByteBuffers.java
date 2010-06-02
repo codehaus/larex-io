@@ -50,9 +50,7 @@ public class CachedByteBuffers implements ByteBuffers
 
     public ByteBuffer acquire(int size, boolean direct)
     {
-        int bucket = size / factor;
-        if (size % factor > 0)
-            ++bucket;
+        int bucket = bucketFor(size);
         ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = direct ? directBuffers : heapBuffers;
 
         // Avoid to create a new queue every time, just to be discarded immediately
@@ -68,7 +66,7 @@ public class CachedByteBuffers implements ByteBuffers
         ByteBuffer result = byteBuffers.poll();
         while (result == null)
         {
-            int capacity = (bucket + 1) * factor;
+            int capacity = bucket * factor;
             result = direct ? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
             byteBuffers.offer(result);
             result = byteBuffers.poll();
@@ -82,10 +80,18 @@ public class CachedByteBuffers implements ByteBuffers
 
     public void release(ByteBuffer buffer)
     {
-        int bucket = buffer.capacity() / factor;
+        int bucket = bucketFor(buffer.capacity());
         ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = buffer.isDirect() ? directBuffers : heapBuffers;
         Queue<ByteBuffer> byteBuffers = buffers.get(bucket);
         if (byteBuffers != null)
             byteBuffers.offer(buffer);
+    }
+
+    private int bucketFor(int size)
+    {
+        int bucket = size / factor;
+        if (size % factor > 0)
+            ++bucket;
+        return bucket;
     }
 }

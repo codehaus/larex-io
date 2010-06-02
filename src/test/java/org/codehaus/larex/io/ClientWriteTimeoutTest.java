@@ -38,21 +38,21 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
     public void testWriteTimeout() throws Exception
     {
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
-        ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool(), getScheduler());
+        ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool());
         int port = serverConnector.listen();
         try
         {
-            ClientConnector connector = new ClientConnector(getThreadPool(), getScheduler())
+            ClientConnector connector = new ClientConnector(getThreadPool())
             {
                 @Override
                 public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
                 {
-                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getScheduler())
+                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool())
                     {
                         @Override
                         protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getScheduler(), getReadTimeout(), getWriteTimeout())
+                            return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                             {
                                 public AtomicInteger writes = new AtomicInteger(0);
 
@@ -88,26 +88,35 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                     };
                 }
             };
-            Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
-            endpoint.setWriteTimeout(1000);
-            StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-            assertTrue(connection.awaitReady(1000));
-
+            connector.open();
             try
             {
+                Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
+                endpoint.setWriteTimeout(1000);
+                StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+                assertTrue(connection.awaitReady(1000));
+
                 try
                 {
-                    connection.flush(ByteBuffer.wrap(new byte[]{1, 2}));
-                    fail();
+                    try
+                    {
+                        connection.flush(ByteBuffer.wrap(new byte[]{1, 2}));
+                        fail();
+                    }
+                    catch (RuntimeSocketTimeoutException x)
+                    {
+                        // Test passed
+                    }
                 }
-                catch (RuntimeSocketTimeoutException x)
+                finally
                 {
-                    // Test passed
+                    connection.softClose(1000);
                 }
             }
             finally
             {
-                connection.softClose(1000);
+                connector.close();
+                connector.join(1000);
             }
         }
         finally
