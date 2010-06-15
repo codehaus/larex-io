@@ -4,21 +4,28 @@
     <parent>
         <groupId>org.codehaus.larex</groupId>
         <artifactId>larex-root</artifactId>
-        <version>1</version>
+        <version>3</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>larex-io</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0.9.0-SNAPSHOT</version>
     <name>Larex :: I/O</name>
 
     <properties>
-        <slf4j-version>1.5.6</slf4j-version>
+        <slf4j-version>1.6.0</slf4j-version>
     </properties>
 
     <build>
-        <defaultGoal>install</defaultGoal>
         <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                </configuration>
+            </plugin>
+<!--
             <plugin>
                 <groupId>org.sonatype.maven.plugin</groupId>
                 <artifactId>emma-maven-plugin</artifactId>
@@ -37,7 +44,6 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.4.3</version>
                 <configuration>
                     <classesDirectory>${project.build.directory}/emma/classes</classesDirectory>
                     <systemProperties>
@@ -68,8 +74,15 @@
                     </execution>
                 </executions>
             </plugin>
+-->
         </plugins>
     </build>
+
+    <scm>
+        <connection>scm:svn:http://svn.codehaus.org/larex/larex-io/trunk</connection>
+        <developerConnection>scm:svn:https://svn.codehaus.org/larex/larex-io/trunk</developerConnection>
+        <url>http://svn.larex.codehaus.org/browse/larex/larex-io/trunk</url>
+    </scm>
 
     <dependencies>
         <dependency>
@@ -86,7 +99,7 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.7</version>
+            <version>4.8.1</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
