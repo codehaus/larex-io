@@ -3,7 +3,7 @@
     <parent>
         <groupId>org.codehaus.larex</groupId>
         <artifactId>larex-root</artifactId>
-        <version>3</version>
+        <version>5</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -78,9 +78,9 @@
     </build>
 
     <scm>
-        <connection>scm:svn:http://svn.codehaus.org/larex/larex-io/trunk</connection>
-        <developerConnection>scm:svn:https://svn.codehaus.org/larex/larex-io/trunk</developerConnection>
-        <url>http://svn.larex.codehaus.org/browse/larex/larex-io/trunk</url>
+        <connection>scm:git:git://git.codehaus.org/larex-io.git</connection>
+        <developerConnection>scm:git:ssh://git@git.codehaus.org/larex-io.git</developerConnection>
+        <url>http://git.codehaus.org/gitweb.cgi?p=larex-io.git</url>
     </scm>
 
     <dependencies>
