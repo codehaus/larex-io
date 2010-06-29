@@ -19,7 +19,12 @@ package org.codehaus.larex.io;
 import java.nio.ByteBuffer;
 
 /**
- * @version $Revision$ $Date$
+ * <p>A {@link Controller} provides an API for user code to interact with the remote peer.</p>
+ * <p>Where a {@link Connection} is passive and receives I/O events, {@link Controller} is
+ * active and allows to control read/write interest, allows to {@link #write(ByteBuffer) write}
+ * to the remote peer and to {@link #close(StreamType) close} the connection.</p>
+ * <p>It also provides user code the ability to add and remove {@link Interceptor}s, which
+ * offer fine grained control on the activity happening on the connection.</p>
  */
 public interface Controller
 {
@@ -28,8 +33,17 @@ public interface Controller
      */
     void setReadBufferSize(int size);
 
+    /**
+     * <p>Appends the given {@code interceptor} to the queue of interceptors.</p>
+     * @param interceptor the interceptor to add
+     */
     void addInterceptor(Interceptor interceptor);
 
+    /**
+     * <p>Removes the given {@code interceptor} from the queue of interceptors.</p>
+     * @param interceptor the interceptor to remove
+     * @return true if the interceptor was removed, false otherwise
+     */
     boolean removeInterceptor(Interceptor interceptor);
 
     /**
