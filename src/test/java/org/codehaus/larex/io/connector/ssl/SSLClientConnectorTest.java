@@ -47,7 +47,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * @version $Revision$ $Date$
+ *
  */
 public class SSLClientConnectorTest extends AbstractTestCase
 {
@@ -347,7 +347,6 @@ public class SSLClientConnectorTest extends AbstractTestCase
 
         final CountDownLatch serverLatch = new CountDownLatch(1);
         final SSLServerSocket sslServerSocket = (SSLServerSocket)sslContext.getServerSocketFactory().createServerSocket(0);
-        System.out.println("PORT=" + sslServerSocket.getLocalPort());
         Thread acceptor = new Thread()
         {
             @Override
