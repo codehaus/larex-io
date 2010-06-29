@@ -21,8 +21,8 @@ package org.codehaus.larex.io;
  * <p>A {@link Selector} associates an {@link Channel} to a {@link Listener} so that
  * when the I/O system associated to the channel signals readiness for I/O events, the listener is
  * notified.</p>
- *
- * @version $Revision: 903 $ $Date$
+ * <p>It is possible to interact with a {@link Selector} only by {@link #submit(Runnable) submitting}
+ * tasks that will be executed by the {@link Selector} on a dedicated thread.
  */
 public interface Selector
 {
@@ -54,6 +54,12 @@ public interface Selector
      * @see #register(Channel, Listener)
      */
     public void unregister(Channel channel, Listener listener);
+
+    /**
+     * Submits the given {@code task} for execution by this {@link Selector}.
+     * @param task the task to execute.
+     */
+    public void submit(Runnable task);
 
     /**
      * <p>Closes this selector.</p>

@@ -41,7 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @version $Revision: 903 $ $Date$
+ *
  */
 public class ServerConnector
 {
@@ -272,7 +272,7 @@ public class ServerConnector
         Selector selector = chooseSelector();
         Coordinator coordinator = newCoordinator(selector);
 
-        Channel channel = newChannel(socketChannel, coordinator);
+        Channel channel = newChannel(selector, socketChannel, coordinator);
         coordinator.setChannel(channel);
 
         Connection connection = newConnection(socketChannel, coordinator);
@@ -294,9 +294,9 @@ public class ServerConnector
         return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
     }
 
-    protected Channel newChannel(SocketChannel channel, Controller controller)
+    protected Channel newChannel(Selector selector, SocketChannel channel, Controller controller)
     {
-        return new StandardChannel(channel, controller);
+        return new StandardChannel(selector, channel, controller);
     }
 
     protected Connection newConnection(SocketChannel socketChannel, Controller controller)

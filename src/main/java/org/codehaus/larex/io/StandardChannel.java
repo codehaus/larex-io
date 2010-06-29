@@ -22,25 +22,28 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @version $Revision: 903 $ $Date$
+ *
  */
 public class StandardChannel implements Channel
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final boolean debug = logger.isDebugEnabled();
+    private final Selector selector;
     private final SocketChannel channel;
     private final Controller controller;
     private volatile int readAggressiveness = 2;
     private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
 
-    public StandardChannel(SocketChannel channel, Controller controller)
+    public StandardChannel(Selector selector, SocketChannel channel, Controller controller)
     {
+        this.selector = selector;
         this.channel = channel;
         this.controller = controller;
     }
@@ -65,18 +68,15 @@ public class StandardChannel implements Channel
         this.writeAggressiveness = writeAggressiveness;
     }
 
-    public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException
+    @Override
+    public boolean register(final java.nio.channels.Selector nioSelector, final Selector.Listener listener) throws RuntimeSocketClosedException
     {
-        try
-        {
-            selectionKey = channel.register(selector, 0, listener);
-        }
-        catch (ClosedChannelException x)
-        {
-            throw new RuntimeSocketClosedException(x);
-        }
+        Register task = new Register(nioSelector, listener);
+        selector.submit(task);
+        return task.result();
     }
 
+    @Override
     public void update(int operations, boolean add) throws RuntimeSocketClosedException
     {
         try
@@ -99,6 +99,17 @@ public class StandardChannel implements Channel
         }
     }
 
+    @Override
+    public void unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener)
+    {
+        final SelectionKey selectionKey = this.selectionKey;
+        if (selectionKey != null)
+        {
+            selectionKey.cancel();
+        }
+    }
+
+    @Override
     public boolean read(ByteBuffer buffer)
     {
         try
@@ -131,6 +142,7 @@ public class StandardChannel implements Channel
         return false;
     }
 
+    @Override
     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
     {
         try
@@ -164,6 +176,7 @@ public class StandardChannel implements Channel
         return result;
     }
 
+    @Override
     public boolean isClosed(StreamType type)
     {
         switch (type)
@@ -179,6 +192,7 @@ public class StandardChannel implements Channel
         }
     }
 
+    @Override
     public void close(StreamType type)
     {
         if (isClosed(type))
@@ -210,25 +224,103 @@ public class StandardChannel implements Channel
         }
     }
 
-    protected void close()
+    protected void close() throws IOException
     {
-        try
-        {
-            SelectionKey selectionKey = this.selectionKey;
-            if (selectionKey != null)
-                selectionKey.cancel();
-
-            channel.close();
-        }
-        catch (IOException x)
-        {
-            throw new RuntimeIOException(x);
-        }
+        Close task = new Close();
+        selector.submit(task);
+        task.await();
     }
 
     @Override
     public String toString()
     {
         return channel.toString();
+    }
+
+    private class Register implements Runnable
+    {
+        private final CountDownLatch latch = new CountDownLatch(1);
+        private final java.nio.channels.Selector selector;
+        private final Selector.Listener listener;
+
+        private Register(java.nio.channels.Selector selector, Selector.Listener listener)
+        {
+            this.selector = selector;
+            this.listener = listener;
+        }
+
+        public void run()
+        {
+            try
+            {
+                selectionKey = channel.register(selector, 0, listener);
+                listener.onOpen();
+            }
+            catch (ClosedChannelException x)
+            {
+                logger.debug("Ignoring registration of listener {} for closed channel {}", listener, channel);
+            }
+            finally
+            {
+                latch.countDown();
+            }
+        }
+
+        private boolean result()
+        {
+            try
+            {
+                latch.await();
+                return selectionKey != null;
+            }
+            catch (InterruptedException x)
+            {
+                throw new RuntimeIOException(x);
+            }
+        }
+    }
+
+    private class Close implements Runnable
+    {
+        private final CountDownLatch latch = new CountDownLatch(1);
+        private volatile IOException exception;
+
+        @Override
+        public void run()
+        {
+            try
+            {
+                final SelectionKey selectionKey = StandardChannel.this.selectionKey;
+                if (selectionKey != null)
+                {
+                    selector.unregister(StandardChannel.this, (Selector.Listener)selectionKey.attachment());
+                    StandardChannel.this.selectionKey = null;
+                }
+                channel.close();
+            }
+            catch (IOException x)
+            {
+                exception = x;
+            }
+            finally
+            {
+                latch.countDown();
+            }
+        }
+
+        private void await()
+        {
+            try
+            {
+                latch.await();
+                final IOException x = exception;
+                if (x != null)
+                    throw new RuntimeIOException(x);
+            }
+            catch (InterruptedException x)
+            {
+                throw new RuntimeIOException(x);
+            }
+        }
     }
 }

@@ -41,7 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @version $Revision$ $Date$
+ *
  */
 public class StandardEndpoint<C extends Connection> extends Endpoint<C>
 {
@@ -159,7 +159,7 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
 
     protected Channel newChannel(Controller controller)
     {
-        return new StandardChannel(getSocketChannel(), controller);
+        return new StandardChannel(getSelector(), getSocketChannel(), controller);
     }
 
     protected void register(Channel channel, Selector.Listener listener)

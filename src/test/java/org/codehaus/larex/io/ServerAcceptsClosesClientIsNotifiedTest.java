@@ -29,7 +29,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
 /**
- * @version $Revision: 903 $ $Date$
+ *
  */
 public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
 {
@@ -42,16 +42,16 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
         ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool())
         {
             @Override
-            protected Channel newChannel(SocketChannel channel, Controller controller)
+            protected Channel newChannel(Selector selector, SocketChannel channel, Controller controller)
             {
-                return new StandardChannel(channel, controller)
+                return new StandardChannel(selector, channel, controller)
                 {
                     @Override
-                    public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException
+                    public boolean register(java.nio.channels.Selector nioSelector, Selector.Listener listener) throws RuntimeSocketClosedException
                     {
                         try
                         {
-                            super.register(selector, listener);
+                            return super.register(nioSelector, listener);
                         }
                         finally
                         {

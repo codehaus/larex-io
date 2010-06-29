@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @version $Revision: 903 $ $Date$
+ *
  */
 public class StandardCoordinator implements Coordinator
 {
@@ -441,7 +441,6 @@ public class StandardCoordinator implements Coordinator
 
         public void close(StreamType type)
         {
-            getSelector().unregister(getChannel(), StandardCoordinator.this);
             getChannel().close(type);
         }
     }

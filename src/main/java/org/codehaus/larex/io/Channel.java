@@ -17,25 +17,24 @@
 package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectableChannel;
 
 /**
  * <p>{@link Channel} hides the complexity of working with {@link SelectableChannel}s.</p>
- *
- * @version $Revision: 903 $ $Date$
  */
 public interface Channel
 {
     /**
-     * <p>Registers this channel with the given {@code selector} for read interest
+     * <p>Registers this channel with the given {@code nioSelector}
      * and with the given {@code listener} as attachment.</p>
      *
-     * @param selector the selector this channel must register with
-     * @param listener the attachment to the registration
+     * @param nioSelector the selector this channel must register with
+     * @param listener the attachment of the registration
+     * @return whether the registration has been successful
      * @throws RuntimeSocketClosedException if this channel has been closed
-     * @see SelectableChannel#register(java.nio.channels.Selector , int, Object)
+     * @see java.nio.channels.SelectableChannel#register(java.nio.channels.Selector , int, Object)
+     * @see #unregister(java.nio.channels.Selector, Selector.Listener)
      */
-    public void register(java.nio.channels.Selector selector, Selector.Listener listener) throws RuntimeSocketClosedException;
+    public boolean register(java.nio.channels.Selector nioSelector, Selector.Listener listener) throws RuntimeSocketClosedException;
 
     /**
      * <p>Updates this channel's interests, adding (or removing) the given {@code operations}.</p>
@@ -45,6 +44,14 @@ public interface Channel
      * @throws RuntimeSocketClosedException if this channel selection key has been canceled
      */
     public void update(int operations, boolean add) throws RuntimeSocketClosedException;
+
+    /**
+     * <p>Unregisters this channel from the given {@code nioSelector}.</p>
+     * @param nioSelector the selector this channel was registered with
+     * @param listener the attachment of the registration
+     * @see #register(java.nio.channels.Selector, Selector.Listener)
+     */
+    public void unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener);
 
     /**
      * <p>Reads bytes from this channel into the given buffer.</p>

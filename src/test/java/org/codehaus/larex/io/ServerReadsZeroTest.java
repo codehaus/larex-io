@@ -32,7 +32,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
 /**
- * @version $Revision: 903 $ $Date$
+ *
  */
 public class ServerReadsZeroTest extends AbstractTestCase
 {
@@ -45,9 +45,9 @@ public class ServerReadsZeroTest extends AbstractTestCase
         ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool())
         {
             @Override
-            protected Channel newChannel(SocketChannel channel, Controller controller)
+            protected Channel newChannel(Selector selector, SocketChannel channel, Controller controller)
             {
-                return new StandardChannel(channel, controller)
+                return new StandardChannel(selector, channel, controller)
                 {
                     private final AtomicInteger reads = new AtomicInteger();
 

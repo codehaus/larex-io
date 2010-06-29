@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @version $Revision: 903 $ $Date$
+ *
  */
 public class ReadWriteSelector implements Selector
 {
@@ -61,7 +61,7 @@ public class ReadWriteSelector implements Selector
 
     public void register(Channel channel, Listener listener)
     {
-        addTask(new RegisterChannel(selector, channel, listener));
+        channel.register(selector, listener);
     }
 
     public void update(Channel channel, int operations, boolean add)
@@ -94,26 +94,19 @@ public class ReadWriteSelector implements Selector
 
     public void unregister(Channel channel, Listener listener)
     {
-        // Default implementation does nothing, since in Java NIO
-        // channel registration and unregistration is asymmetric:
-        // java.nio.SelectableChannel.register() is not complemented
-        // by an unregister() method, but by SelectionKey.cancel().
+        channel.unregister(selector, listener);
     }
 
     public void close()
     {
-        addTask(new Close());
+        submit(new Close());
     }
 
-    protected boolean addTask(Runnable task)
+    public void submit(Runnable task)
     {
-        boolean result = tasks.add(task);
-        if (result)
-        {
-            logger.debug("Added task {}", task);
-            wakeup();
-        }
-        return result;
+        tasks.add(task);
+        logger.debug("Added task {}", task);
+        wakeup();
     }
 
     protected void wakeup()
@@ -225,33 +218,6 @@ public class ReadWriteSelector implements Selector
         }
     }
 
-    private class RegisterChannel implements Runnable
-    {
-        private final java.nio.channels.Selector selector;
-        private final Channel channel;
-        private final Listener listener;
-
-        private RegisterChannel(java.nio.channels.Selector selector, Channel channel, Listener listener)
-        {
-            this.selector = selector;
-            this.channel = channel;
-            this.listener = listener;
-        }
-
-        public void run()
-        {
-            try
-            {
-                channel.register(selector, listener);
-                listener.onOpen();
-            }
-            catch (RuntimeSocketClosedException x)
-            {
-                logger.debug("Ignoring registration of listener {} for closed channel {}", listener, channel);
-            }
-        }
-    }
-
     private class Close implements Runnable
     {
         public void run()
@@ -284,7 +250,7 @@ public class ReadWriteSelector implements Selector
             }
             finally
             {
-                logger.info("Selector loop exited");
+                logger.debug("Selector loop exited");
             }
         }
     }
