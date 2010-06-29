@@ -39,6 +39,7 @@ public class ReadWriteSelector implements Selector
     private final Queue<Runnable> tasks = new ConcurrentLinkedQueue<Runnable>();
     private volatile java.nio.channels.Selector selector;
     private volatile Thread thread;
+    private volatile boolean needsWakeup;
 
     public void open()
     {
@@ -83,7 +84,7 @@ public class ReadWriteSelector implements Selector
         try
         {
             channel.update(operations, add);
-            if (Thread.currentThread() != thread)
+            if (needsWakeup)
                 wakeup();
         }
         catch (RuntimeSocketClosedException x)
@@ -106,7 +107,11 @@ public class ReadWriteSelector implements Selector
     {
         tasks.add(task);
         logger.debug("Added task {}", task);
-        wakeup();
+        final boolean wakeup = needsWakeup;
+        if (wakeup)
+            wakeup();
+        else
+            logger.info("Avoided wakeup for task {}", task);
     }
 
     protected void wakeup()
@@ -122,6 +127,20 @@ public class ReadWriteSelector implements Selector
 
     protected void processTasks()
     {
+        runTasks();
+
+        // If tasks are submitted here, they read will not wakeup the selector
+        // Therefore below we run again the tasks
+
+        needsWakeup = true;
+
+        // Run again the tasks to avoid the race condition where a task is
+        // submitted but will not wake up the selector
+        runTasks();
+    }
+
+    private void runTasks()
+    {
         Runnable task;
         while ((task = tasks.poll()) != null)
         {
@@ -133,42 +152,37 @@ public class ReadWriteSelector implements Selector
     protected void select()
     {
         boolean debug = logger.isDebugEnabled();
+        int selected = 0;
         while (selector.isOpen())
         {
             try
             {
                 processTasks();
 
-                int selected = 0;
-//                int selected = selector.selectNow();
-//                if (debug)
-//                    logger.debug("Selector loop pre-selecting, {}/{} selected", selected, selector.keys().size());
+                if (debug)
+                    logger.debug("Selector loop waiting on select");
+                selected = selector.select();
+                if (debug)
+                    logger.debug("Selector loop woken up from select, {}/{} selected", selected, selector.keys().size());
 
-//                if (selected == 0)
+                needsWakeup = false;
+
+                // Closing the selector causes a wakeup, check if we have to exit
+                if (!selector.isOpen())
+                    break;
+
+                // The select() may be woken up by selection key updates (for example
+                // from NONE to READ interest), but most of the times the number of
+                // keys selected will be zero.
+                // Therefore we select again without blocking so that the selector
+                // will notice that the selection key was updated.
+                // This gives an good performance boost (benchmark with and without
+                // to believe it).
+                if (selected == 0)
                 {
+                    selected = selector.selectNow();
                     if (debug)
-                        logger.debug("Selector loop waiting on select");
-                    selected = selector.select();
-                    if (debug)
-                        logger.debug("Selector loop woken up from select, {}/{} selected", selected, selector.keys().size());
-
-                    // Closing the selector causes a wakeup, check if we have to exit
-                    if (!selector.isOpen())
-                        break;
-
-                    // The select() may be woken up by selection key updates (for example
-                    // from NONE to READ interest), but most of the times the number of
-                    // keys selected will be zero.
-                    // Therefore we select again without blocking so that the selector
-                    // will notice that the selection key was updated.
-                    // This gives an good performance boost (benchmark with and without
-                    // to believe it).
-                    if (selected == 0)
-                    {
-                        selected = selector.selectNow();
-                        if (debug)
-                            logger.debug("Selector loop re-selecting, {}/{} selected", selected, selector.keys().size());
-                    }
+                        logger.debug("Selector loop re-selecting, {}/{} selected", selected, selector.keys().size());
                 }
 
                 if (selected > 0)
