@@ -57,6 +57,7 @@ public class ServerConnector
     private volatile Selector[] selectors;
     private volatile int acceptorCount = 1;
     private volatile Thread[] acceptors;
+    private volatile boolean tcpNoDelay = true;
     private volatile boolean reuseAddress = true;
     private volatile int backlogSize = 128;
     private volatile long readTimeout = 0;
@@ -108,6 +109,16 @@ public class ServerConnector
     public void setAcceptorCount(int acceptorCount)
     {
         this.acceptorCount = acceptorCount;
+    }
+
+    public boolean isTCPNoDelay()
+    {
+        return tcpNoDelay;
+    }
+
+    public void setTCPNoDelay(boolean tcpNoDelay)
+    {
+        this.tcpNoDelay = tcpNoDelay;
     }
 
     public Boolean isReuseAddress()
@@ -267,6 +278,8 @@ public class ServerConnector
 
     protected void accepted(SocketChannel socketChannel) throws IOException
     {
+        socketChannel.socket().setTcpNoDelay(isTCPNoDelay());
+
         socketChannel.configureBlocking(false);
 
         Selector selector = chooseSelector();

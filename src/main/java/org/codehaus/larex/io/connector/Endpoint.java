@@ -26,6 +26,8 @@ import org.codehaus.larex.io.Connection;
 public abstract class Endpoint<T extends Connection>
 {
     private InetSocketAddress bindAddress;
+    private boolean tcpNoDelay = true;
+    private boolean reuseAddress = true;
     private long connectTimeout;
     private long readTimeout;
     private long writeTimeout;
@@ -38,6 +40,26 @@ public abstract class Endpoint<T extends Connection>
     public void setBindAddress(InetSocketAddress bindAddress)
     {
         this.bindAddress = bindAddress;
+    }
+
+    public boolean isTCPNoDelay()
+    {
+        return tcpNoDelay;
+    }
+
+    public void setTCPNoDelay(boolean tcpNoDelay)
+    {
+        this.tcpNoDelay = tcpNoDelay;
+    }
+
+    public boolean isReuseAddress()
+    {
+        return reuseAddress;
+    }
+
+    public void setReuseAddress(boolean reuseAddress)
+    {
+        this.reuseAddress = reuseAddress;
     }
 
     public long getConnectTimeout()

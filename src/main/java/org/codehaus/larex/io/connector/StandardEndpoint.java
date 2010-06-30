@@ -94,12 +94,17 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
         try
         {
             Socket socket = channel.socket();
+
+            socket.setTcpNoDelay(isTCPNoDelay());
+            socket.setReuseAddress(isReuseAddress());
+
             InetSocketAddress bindAddress = getBindAddress();
             if (bindAddress != null)
             {
                 socket.bind(bindAddress);
                 logger.debug("{} bound to {}", this, bindAddress);
             }
+
             long connectTimeout = getConnectTimeout();
             if (connectTimeout < 0)
                 connectTimeout = 0;
