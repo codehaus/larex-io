@@ -81,16 +81,7 @@ public class ReadWriteSelector implements Selector
         // that it can call select() and notice that the selection key
         // status has changed.
 
-        try
-        {
-            channel.update(operations, add);
-            if (needsWakeup)
-                wakeup();
-        }
-        catch (RuntimeSocketClosedException x)
-        {
-            logger.debug("Ignoring update for closed channel {}", channel);
-        }
+        channel.update(operations, add);
     }
 
     public void unregister(Channel channel, Listener listener)
@@ -105,13 +96,19 @@ public class ReadWriteSelector implements Selector
 
     public void submit(Runnable task)
     {
-        tasks.add(task);
-        logger.debug("Added task {}", task);
-        final boolean wakeup = needsWakeup;
-        if (wakeup)
-            wakeup();
+        if (Thread.currentThread() != thread)
+        {
+            tasks.add(task);
+            logger.debug("Added task {}", task);
+            if (needsWakeup)
+                wakeup();
+        }
         else
-            logger.info("Avoided wakeup for task {}", task);
+        {
+            runTasks();
+            task.run();
+            logger.debug("Avoided wakeup for task {}", task);
+        }
     }
 
     protected void wakeup()

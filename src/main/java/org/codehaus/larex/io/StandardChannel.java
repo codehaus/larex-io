@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
-public class StandardChannel implements Channel
+public class StandardChannel implements Channel, Runnable
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final boolean debug = logger.isDebugEnabled();
@@ -40,6 +40,7 @@ public class StandardChannel implements Channel
     private volatile int readAggressiveness = 2;
     private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
+    private volatile int interestOps;
 
     public StandardChannel(Selector selector, SocketChannel channel, Controller controller)
     {
@@ -79,23 +80,41 @@ public class StandardChannel implements Channel
     @Override
     public void update(int operations, boolean add) throws RuntimeSocketClosedException
     {
+        int oldOperations = interestOps;
+        int newOperations;
+        if (add)
+            newOperations = oldOperations | operations;
+        else
+            newOperations = oldOperations & ~operations;
+        if (newOperations != oldOperations)
+        {
+            interestOps = newOperations;
+            selector.submit(this);
+        }
+    }
+
+    @Override
+    public void run()
+    {
+        SelectionKey selectionKey = this.selectionKey;
+        if (selectionKey == null)
+        {
+            if (debug)
+                logger.debug("Ignoring update for already closed channel {}", channel);
+            return;
+        }
+
         try
         {
-            SelectionKey selectionKey = this.selectionKey;
             int oldOperations = selectionKey.interestOps();
-            int newOperations;
-            if (add)
-                newOperations = oldOperations | operations;
-            else
-                newOperations = oldOperations & ~operations;
-            if (newOperations != oldOperations)
-                selectionKey.interestOps(newOperations);
+            int newOperations = interestOps;
+            selectionKey.interestOps(newOperations);
             if (debug)
                 logger.debug("Channel {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
         }
         catch (CancelledKeyException x)
         {
-            throw new RuntimeSocketClosedException(x);
+            logger.debug("Ignoring update for concurrently closed channel {}", channel);
         }
     }
 
@@ -104,9 +123,7 @@ public class StandardChannel implements Channel
     {
         final SelectionKey selectionKey = this.selectionKey;
         if (selectionKey != null)
-        {
             selectionKey.cancel();
-        }
     }
 
     @Override
