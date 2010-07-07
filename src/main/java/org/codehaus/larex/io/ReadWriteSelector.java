@@ -106,7 +106,7 @@ public class ReadWriteSelector implements Selector
         else
         {
             runTasks();
-            task.run();
+            runTask(task);
             logger.debug("Avoided wakeup for task {}", task);
         }
     }
@@ -142,8 +142,13 @@ public class ReadWriteSelector implements Selector
         while ((task = tasks.poll()) != null)
         {
             logger.debug("Processing task {}", task);
-            task.run();
+            runTask(task);
         }
+    }
+
+    protected void runTask(Runnable task)
+    {
+        task.run();
     }
 
     protected void select()
