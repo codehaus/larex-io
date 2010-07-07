@@ -17,6 +17,7 @@
 package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
 
 /**
  * <p>{@link Channel} hides the complexity of working with {@link SelectableChannel}s.</p>
@@ -49,9 +50,10 @@ public interface Channel
      * <p>Unregisters this channel from the given {@code nioSelector}.</p>
      * @param nioSelector the selector this channel was registered with
      * @param listener the attachment of the registration
+     * @return whether the unregistration has been successful
      * @see #register(java.nio.channels.Selector, Selector.Listener)
      */
-    public void unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener);
+    public boolean unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener);
 
     /**
      * <p>Reads bytes from this channel into the given buffer.</p>

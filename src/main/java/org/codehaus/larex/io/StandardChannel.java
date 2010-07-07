@@ -27,9 +27,6 @@ import java.util.concurrent.CountDownLatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- *
- */
 public class StandardChannel implements Channel, Runnable
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -119,11 +116,11 @@ public class StandardChannel implements Channel, Runnable
     }
 
     @Override
-    public void unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener)
+    public boolean unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener)
     {
-        final SelectionKey selectionKey = this.selectionKey;
-        if (selectionKey != null)
-            selectionKey.cancel();
+        Unregister task = new Unregister();
+        selector.submit(task);
+        return task.result();
     }
 
     @Override
@@ -289,6 +286,36 @@ public class StandardChannel implements Channel, Runnable
             {
                 latch.await();
                 return selectionKey != null;
+            }
+            catch (InterruptedException x)
+            {
+                throw new RuntimeIOException(x);
+            }
+        }
+    }
+
+    private class Unregister implements Runnable
+    {
+        private final CountDownLatch latch = new CountDownLatch(1);
+        private volatile boolean result;
+
+        @Override
+        public void run()
+        {
+            final SelectionKey selectionKey = StandardChannel.this.selectionKey;
+            if (selectionKey != null)
+            {
+                selectionKey.cancel();
+                result = true;
+            }
+        }
+
+        public boolean result()
+        {
+            try
+            {
+                latch.await();
+                return result;
             }
             catch (InterruptedException x)
             {
