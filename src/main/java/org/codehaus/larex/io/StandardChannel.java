@@ -302,11 +302,18 @@ public class StandardChannel implements Channel, Runnable
         @Override
         public void run()
         {
-            final SelectionKey selectionKey = StandardChannel.this.selectionKey;
-            if (selectionKey != null)
+            try
             {
-                selectionKey.cancel();
-                result = true;
+                final SelectionKey selectionKey = StandardChannel.this.selectionKey;
+                if (selectionKey != null)
+                {
+                    selectionKey.cancel();
+                    result = true;
+                }
+            }
+            finally
+            {
+                latch.countDown();
             }
         }
 
