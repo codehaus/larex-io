@@ -145,13 +145,21 @@ public class StandardChannel implements Channel, Runnable
     protected boolean readAggressively(SocketChannel channel, ByteBuffer buffer) throws IOException
     {
         int aggressiveness = getReadAggressiveness();
-        while (--aggressiveness >= 0)
+        while (true)
         {
             int read = channel.read(buffer);
-            if (read < 0)
-                return true;
             if (!buffer.hasRemaining())
                 break;
+            if (read < 0)
+                return true;
+            else if (read > 0)
+                aggressiveness = getReadAggressiveness();
+            else
+            {
+                --aggressiveness;
+                if (aggressiveness == 0)
+                    break;
+            }
         }
         return false;
     }
@@ -181,11 +189,20 @@ public class StandardChannel implements Channel, Runnable
     {
         int aggressiveness = getWriteAggressiveness();
         int result = 0;
-        while (--aggressiveness >= 0)
+        while (true)
         {
-            result += this.channel.write(buffer);
+            int written = channel.write(buffer);
+            result += written;
             if (!buffer.hasRemaining())
                 break;
+            if (written > 0)
+                aggressiveness = getWriteAggressiveness();
+            else
+            {
+                --aggressiveness;
+                if (aggressiveness == 0)
+                    break;
+            }
         }
         return result;
     }
