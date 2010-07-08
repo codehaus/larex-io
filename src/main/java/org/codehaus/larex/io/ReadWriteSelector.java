@@ -28,9 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- *
- */
 public class ReadWriteSelector implements Selector
 {
     private static final AtomicInteger ids = new AtomicInteger();
@@ -89,11 +86,6 @@ public class ReadWriteSelector implements Selector
         channel.unregister(selector, listener);
     }
 
-    public void close()
-    {
-        submit(new Close());
-    }
-
     public void submit(Runnable task)
     {
         if (Thread.currentThread() != thread)
@@ -116,10 +108,93 @@ public class ReadWriteSelector implements Selector
         selector.wakeup();
     }
 
+    public void close()
+    {
+        submit(new Close());
+    }
+
     public boolean join(long timeout) throws InterruptedException
     {
         thread.join(timeout);
         return !thread.isAlive();
+    }
+
+    protected void selectLoop()
+    {
+        boolean debug = logger.isDebugEnabled();
+        while (selector.isOpen())
+        {
+            try
+            {
+                processTasks();
+
+                if (debug)
+                    logger.debug("Selector loop waiting on select");
+                int selected = select();
+                if (debug)
+                    logger.debug("Selector loop woken up from select, {}/{} selected", selected, selector.keys().size());
+
+                needsWakeup = false;
+
+                // Closing the selector causes a wakeup, check if we have to exit
+                if (!selector.isOpen())
+                    break;
+
+                // The select() may be woken up by selection key updates (for example
+                // from NONE to READ interest), but most of the times the number of
+                // keys selected will be zero.
+                // Therefore we select again without blocking so that the selector
+                // will notice that the selection key was updated.
+                // This gives an good performance boost (benchmark with and without
+                // to believe it).
+                if (selected == 0)
+                {
+                    selected = selectNow();
+                    if (debug)
+                        logger.debug("Selector loop re-selecting, {}/{} selected", selected, selector.keys().size());
+                }
+
+                if (selected > 0)
+                {
+                    Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                    for (Iterator<SelectionKey> iterator = selectedKeys.iterator(); iterator.hasNext();)
+                    {
+                        SelectionKey selectedKey = iterator.next();
+                        if (debug)
+                            logger.debug("Selector loop selected key {} with operations {}", selectedKey, selectedKey.interestOps());
+                        iterator.remove();
+
+                        if (!selectedKey.isValid())
+                        {
+                            if (debug)
+                                logger.debug("Selector loop ignoring invalid key {}", selectedKey);
+                            continue;
+                        }
+
+                        processKey(selectedKey);
+                    }
+                }
+            }
+            catch (ClosedSelectorException x)
+            {
+                break;
+            }
+            catch (IOException x)
+            {
+                close();
+                throw new RuntimeIOException(x);
+            }
+        }
+    }
+
+    protected int select() throws IOException
+    {
+        return selector.select();
+    }
+
+    protected int selectNow() throws IOException
+    {
+        return selector.selectNow();
     }
 
     protected void processTasks()
@@ -151,76 +226,7 @@ public class ReadWriteSelector implements Selector
         task.run();
     }
 
-    protected void select()
-    {
-        boolean debug = logger.isDebugEnabled();
-        int selected = 0;
-        while (selector.isOpen())
-        {
-            try
-            {
-                processTasks();
-
-                if (debug)
-                    logger.debug("Selector loop waiting on select");
-                selected = selector.select();
-                if (debug)
-                    logger.debug("Selector loop woken up from select, {}/{} selected", selected, selector.keys().size());
-
-                needsWakeup = false;
-
-                // Closing the selector causes a wakeup, check if we have to exit
-                if (!selector.isOpen())
-                    break;
-
-                // The select() may be woken up by selection key updates (for example
-                // from NONE to READ interest), but most of the times the number of
-                // keys selected will be zero.
-                // Therefore we select again without blocking so that the selector
-                // will notice that the selection key was updated.
-                // This gives an good performance boost (benchmark with and without
-                // to believe it).
-                if (selected == 0)
-                {
-                    selected = selector.selectNow();
-                    if (debug)
-                        logger.debug("Selector loop re-selecting, {}/{} selected", selected, selector.keys().size());
-                }
-
-                if (selected > 0)
-                {
-                    Set<SelectionKey> selectedKeys = selector.selectedKeys();
-                    for (Iterator<SelectionKey> iterator = selectedKeys.iterator(); iterator.hasNext();)
-                    {
-                        SelectionKey selectedKey = iterator.next();
-                        if (debug)
-                            logger.debug("Selector loop selected key {} with operations {}", selectedKey, selectedKey.interestOps());
-                        iterator.remove();
-
-                        if (!selectedKey.isValid())
-                        {
-                            if (debug)
-                                logger.debug("Ignoring invalid key {}", selectedKey);
-                            continue;
-                        }
-
-                        process(selectedKey);
-                    }
-                }
-            }
-            catch (ClosedSelectorException x)
-            {
-                break;
-            }
-            catch (IOException x)
-            {
-                close();
-                throw new RuntimeIOException(x);
-            }
-        }
-    }
-
-    protected void process(SelectionKey selectedKey) throws IOException
+    protected void processKey(SelectionKey selectedKey) throws IOException
     {
         if (selectedKey.isReadable())
         {
@@ -262,7 +268,7 @@ public class ReadWriteSelector implements Selector
             logger.debug("Selector loop entered");
             try
             {
-                select();
+                selectLoop();
             }
             finally
             {
