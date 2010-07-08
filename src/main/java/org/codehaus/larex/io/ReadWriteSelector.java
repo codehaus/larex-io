@@ -17,6 +17,7 @@
 package org.codehaus.larex.io;
 
 import java.io.IOException;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
 import java.util.Iterator;
@@ -228,15 +229,22 @@ public class ReadWriteSelector implements Selector
 
     protected void processKey(SelectionKey selectedKey) throws IOException
     {
-        if (selectedKey.isReadable())
+        try
         {
-            Listener listener = (Listener)selectedKey.attachment();
-            listener.onReadReady();
+            if (selectedKey.isReadable())
+            {
+                Listener listener = (Listener)selectedKey.attachment();
+                listener.onReadReady();
+            }
+            if (selectedKey.isWritable())
+            {
+                Listener listener = (Listener)selectedKey.attachment();
+                listener.onWriteReady();
+            }
         }
-        if (selectedKey.isWritable())
+        catch (CancelledKeyException x)
         {
-            Listener listener = (Listener)selectedKey.attachment();
-            listener.onWriteReady();
+            logger.info("Ignoring cancelled key {}", selectedKey);
         }
     }
 
