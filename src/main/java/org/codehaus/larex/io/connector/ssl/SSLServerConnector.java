@@ -45,7 +45,7 @@ import org.codehaus.larex.io.ssl.SSLInterceptor;
  */
 public class SSLServerConnector extends ServerConnector
 {
-    private final ByteBuffers sslByteBuffers;
+    private volatile ByteBuffers sslByteBuffers;
     private volatile String protocolAlgorithm = "SSLv3";
     private volatile String keyStoreType = "JKS";
     private volatile String keyStoreResource = null;
@@ -62,7 +62,14 @@ public class SSLServerConnector extends ServerConnector
     public SSLServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool)
     {
         super(address, connectionFactory, threadPool);
-        this.sslByteBuffers = newSSLByteBuffers(); // TODO: not from here: override listen()
+    }
+
+    @Override
+    public int listen() throws RuntimeIOException
+    {
+        int result = super.listen();
+        this.sslByteBuffers = newSSLByteBuffers();
+        return result;
     }
 
     protected ByteBuffers newSSLByteBuffers()
