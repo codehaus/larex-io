@@ -20,13 +20,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * TODO: adding a task for timeouts is expensive for 20k connections
- * If all connections gets created at same time, there are 20k tasks running at the same time
- * Coalesce ? Or have one static task that runs over all coordinators ?
- *
- * @version $Revision$ $Date$
- */
 public class TimeoutCoordinator extends StandardCoordinator
 {
     private final AtomicReference<State> readState = new AtomicReference<State>(State.WAIT);
@@ -41,6 +34,22 @@ public class TimeoutCoordinator extends StandardCoordinator
         super(selector, byteBuffers, threadPool);
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;
+    }
+
+    @Override
+    public void needsRead(boolean needsRead)
+    {
+        if (readTime == 0L && needsRead)
+            readTime = now();
+        super.needsRead(needsRead);
+    }
+
+    @Override
+    protected void readEnd(int read, boolean needsRead)
+    {
+        if (needsRead)
+            readTime = now();
+        super.readEnd(read, needsRead);
     }
 
     public void timeoutRead()
@@ -60,6 +69,21 @@ public class TimeoutCoordinator extends StandardCoordinator
                 });
             }
         }
+    }
+
+    @Override
+    protected void writeBegin()
+    {
+        writeTime = 0L;
+        super.writeBegin();
+    }
+
+    @Override
+    protected void writeEnd(int written, boolean needsWrite)
+    {
+        if (needsWrite)
+            writeTime = now();
+        super.writeEnd(written, needsWrite);
     }
 
     public void timeoutWrite()
@@ -82,43 +106,13 @@ public class TimeoutCoordinator extends StandardCoordinator
     }
 
     @Override
-    public void onReadReady()
-    {
-        readTime = 0L;
-        super.onReadReady();
-    }
-
-    @Override
-    public void needsRead(boolean needsRead)
-    {
-        if (needsRead)
-            readTime = now();
-        super.needsRead(needsRead);
-    }
-
-    @Override
-    public void onWriteReady()
-    {
-        writeTime = 0L;
-        super.onWriteReady();
-    }
-
-    @Override
-    public void needsWrite(boolean needsWrite)
-    {
-        if (needsWrite)
-            writeTime = now();
-        super.needsWrite(needsWrite);
-    }
-
-    @Override
-    protected void onReadAction()
+    protected void processOnRead()
     {
         // Notify reads in any case, even if we could not change the state
         boolean reading = readState.compareAndSet(State.WAIT, State.ACTIVE);
         try
         {
-            super.onReadAction();
+            super.processOnRead();
         }
         finally
         {
@@ -144,13 +138,13 @@ public class TimeoutCoordinator extends StandardCoordinator
     }
 
     @Override
-    protected void onWriteAction()
+    protected void processOnWrite()
     {
         // Notify writes in any case, even if we could not change the state
         boolean writing = writeState.compareAndSet(State.WAIT, State.ACTIVE);
         try
         {
-            super.onWriteAction();
+            super.processOnWrite();
         }
         finally
         {

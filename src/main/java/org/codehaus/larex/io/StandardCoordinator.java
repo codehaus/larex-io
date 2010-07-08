@@ -23,9 +23,6 @@ import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- *
- */
 public class StandardCoordinator implements Coordinator
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
@@ -70,6 +67,7 @@ public class StandardCoordinator implements Coordinator
         return channel;
     }
 
+    @Override
     public void setChannel(Channel channel)
     {
         this.channel = channel;
@@ -80,6 +78,7 @@ public class StandardCoordinator implements Coordinator
         return connection;
     }
 
+    @Override
     public void setConnection(Connection connection)
     {
         this.connection = connection;
@@ -90,11 +89,13 @@ public class StandardCoordinator implements Coordinator
         return readBufferSize;
     }
 
+    @Override
     public void setReadBufferSize(int size)
     {
         this.readBufferSize = size;
     }
 
+    @Override
     public void addInterceptor(Interceptor interceptor)
     {
         Interceptor target = headInterceptor;
@@ -104,6 +105,7 @@ public class StandardCoordinator implements Coordinator
         interceptor.setNext(tailInterceptor);
     }
 
+    @Override
     public boolean removeInterceptor(Interceptor interceptor)
     {
         Interceptor target = headInterceptor;
@@ -118,12 +120,19 @@ public class StandardCoordinator implements Coordinator
         return false;
     }
 
+    @Override
     public void onOpen()
     {
-        getInterceptor().onPrepare();
+        getInterceptor().onPrepare(); // TODO: is this needed ?
         getThreadPool().execute(onOpenAction);
     }
 
+    protected void processOnOpen()
+    {
+        getInterceptor().onOpen();
+    }
+
+    @Override
     public void onReadReady()
     {
         // Remove interest in further reads, otherwise the select loop will
@@ -133,73 +142,15 @@ public class StandardCoordinator implements Coordinator
         getThreadPool().execute(onReadAction);
     }
 
-    public void onWriteReady()
-    {
-        // Remove interest in further writes, otherwise the select loop will
-        // continue to notify us that it is ready to write
-        needsWrite(false);
-        // Notify the suspended thread that it can write some more
-        getThreadPool().execute(onWriteAction);
-    }
-
-    public void onClose()
-    {
-        getThreadPool().execute(onCloseAction);
-    }
-
-    public void needsRead(boolean needsRead)
-    {
-        getSelector().update(getChannel(), SelectionKey.OP_READ, needsRead);
-    }
-
-    public void needsWrite(boolean needsWrite)
-    {
-        getSelector().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
-    }
-
-    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
-    {
-        return getInterceptor().write(buffer);
-    }
-
-    protected void onRemoteClose()
-    {
-        try
-        {
-            getInterceptor().onRemoteClose();
-        }
-        finally
-        {
-            close(StreamType.INPUT_OUTPUT);
-        }
-    }
-
-    public void close(StreamType type)
-    {
-        if (type == null)
-            throw new NullPointerException();
-
-        getInterceptor().onClosing(type);
-        try
-        {
-            getInterceptor().close(type);
-        }
-        finally
-        {
-            getInterceptor().onClosed(type);
-        }
-    }
-
-    protected void onOpenAction()
-    {
-        getInterceptor().onOpen();
-    }
-
-    protected void onReadAction()
+    protected void processOnRead()
     {
         int read;
+        int totalRead = 0;
         boolean closed;
         boolean readMore = true;
+
+        readBegin();
+
         int readBufferSize = getReadBufferSize();
         ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, false);
         try
@@ -209,8 +160,9 @@ public class StandardCoordinator implements Coordinator
             while (true)
             {
                 int start = buffer.position();
-                closed = getChannel().read(buffer);
+                closed = doRead(buffer);
                 read = buffer.position() - start;
+                totalRead += read;
 
                 if (read > 0)
                 {
@@ -229,6 +181,8 @@ public class StandardCoordinator implements Coordinator
         finally
         {
             getByteBuffers().release(buffer);
+
+            readEnd(totalRead, readMore);
         }
 
         if (closed)
@@ -243,14 +197,123 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    protected void onWriteAction()
+    protected void readBegin()
+    {
+    }
+
+    protected boolean doRead(ByteBuffer buffer)
+    {
+        return getChannel().read(buffer);
+    }
+
+    protected void readEnd(int read, boolean needsRead)
+    {
+    }
+
+    @Override
+    public void onWriteReady()
+    {
+        // Remove interest in further writes, otherwise the select loop will
+        // continue to notify us that it is ready to write
+        needsWrite(false);
+        // Notify the suspended thread that it can write some more
+        getThreadPool().execute(onWriteAction);
+    }
+
+    protected void processOnWrite()
     {
         getInterceptor().onWrite();
     }
 
-    protected void onCloseAction()
+    @Override
+    public void timeoutRead()
+    {
+    }
+
+    @Override
+    public void timeoutWrite()
+    {
+    }
+
+    @Override
+    public void onClose()
+    {
+        getThreadPool().execute(onCloseAction);
+    }
+
+    protected void processOnClose()
     {
         close(StreamType.INPUT_OUTPUT);
+    }
+
+    @Override
+    public void needsRead(boolean needsRead)
+    {
+        getSelector().update(getChannel(), SelectionKey.OP_READ, needsRead);
+    }
+
+    @Override
+    public void needsWrite(boolean needsWrite)
+    {
+        getSelector().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
+    }
+
+    @Override
+    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
+    {
+        writeBegin();
+        int written = -1;
+        try
+        {
+            written = doWrite(buffer);
+            return written;
+        }
+        finally
+        {
+            writeEnd(written, buffer.hasRemaining());
+        }
+    }
+
+    protected void writeBegin()
+    {
+    }
+
+    protected int doWrite(ByteBuffer buffer)
+    {
+        return getInterceptor().write(buffer);
+    }
+
+    protected void writeEnd(int written, boolean needsWrite)
+    {
+    }
+
+    protected void onRemoteClose()
+    {
+        try
+        {
+            getInterceptor().onRemoteClose();
+        }
+        finally
+        {
+            close(StreamType.INPUT_OUTPUT);
+        }
+    }
+
+    @Override
+    public void close(StreamType type)
+    {
+        if (type == null)
+            throw new NullPointerException();
+
+        getInterceptor().onClosing(type);
+        try
+        {
+            getInterceptor().close(type);
+        }
+        finally
+        {
+            getInterceptor().onClosed(type);
+        }
     }
 
     protected boolean onRead(ByteBuffer buffer)
@@ -265,19 +328,21 @@ public class StandardCoordinator implements Coordinator
 
     private class OnOpenAction implements Runnable
     {
+        @Override
         public void run()
         {
-            onOpenAction();
+            processOnOpen();
         }
     }
 
     private class OnReadAction implements Runnable
     {
+        @Override
         public void run()
         {
             try
             {
-                onReadAction();
+                processOnRead();
             }
             catch (RuntimeSocketClosedException x)
             {
@@ -292,11 +357,12 @@ public class StandardCoordinator implements Coordinator
 
     private class OnWriteAction implements Runnable
     {
+        @Override
         public void run()
         {
             try
             {
-                onWriteAction();
+                processOnWrite();
             }
             catch (Exception x)
             {
@@ -307,11 +373,12 @@ public class StandardCoordinator implements Coordinator
 
     private class OnCloseAction implements Runnable
     {
+        @Override
         public void run()
         {
             try
             {
-                onCloseAction();
+                processOnClose();
             }
             catch (Exception x)
             {
@@ -322,21 +389,25 @@ public class StandardCoordinator implements Coordinator
 
     private class StandardInterceptor implements Interceptor
     {
+        @Override
         public Interceptor getNext()
         {
             return null;
         }
 
+        @Override
         public void setNext(Interceptor interceptor)
         {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         public void onPrepare()
         {
             getConnection().prepareEvent();
         }
 
+        @Override
         public void onOpen()
         {
             try
@@ -349,6 +420,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public void onReadTimeout()
         {
             try
@@ -361,6 +433,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public boolean onRead(ByteBuffer buffer)
         {
             try
@@ -374,6 +447,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public void onWrite()
         {
             try
@@ -386,6 +460,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public void onWriteTimeout()
         {
             try
@@ -398,11 +473,13 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public int write(ByteBuffer buffer)
         {
             return getChannel().write(buffer);
         }
 
+        @Override
         public void onRemoteClose()
         {
             try
@@ -415,6 +492,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public void onClosing(StreamType type)
         {
             try
@@ -427,6 +505,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public void onClosed(StreamType type)
         {
             try
@@ -439,6 +518,7 @@ public class StandardCoordinator implements Coordinator
             }
         }
 
+        @Override
         public void close(StreamType type)
         {
             getChannel().close(type);

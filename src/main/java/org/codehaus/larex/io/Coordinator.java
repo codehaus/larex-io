@@ -35,4 +35,16 @@ public interface Coordinator extends Selector.Listener, Controller
      * @param connection the connection associated with this coordinator
      */
     public void setConnection(Connection connection);
+
+    /**
+     * <p>Invoked to check if the read timeout has elapsed, and if so, fire the appropriate event.</p>
+     * @see Interceptor#onReadTimeout()
+     */
+    public void timeoutRead();
+
+    /**
+     * <p>Invoked to check if the write timeout has elapsed, and if so, fire the appropriate event.</p>
+     * @see Interceptor#onWriteTimeout()
+     */
+    public void timeoutWrite();
 }

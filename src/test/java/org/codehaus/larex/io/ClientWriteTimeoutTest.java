@@ -40,6 +40,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
         ServerConnector serverConnector = new ServerConnector(address, new StandardConnection.Factory(), getThreadPool());
         int port = serverConnector.listen();
+
         try
         {
             ClientConnector connector = new ClientConnector(getThreadPool())
@@ -56,7 +57,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                             {
                                 public AtomicInteger writes = new AtomicInteger(0);
 
-                                public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
+                                public int doWrite(ByteBuffer buffer)
                                 {
                                     if (writes.addAndGet(1) == 1)
                                     {
@@ -89,6 +90,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                 }
             };
             connector.open();
+
             try
             {
                 Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());

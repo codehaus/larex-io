@@ -85,10 +85,10 @@ public class ServerWritesZeroTest extends AbstractTestCase
             {
                 return new StandardCoordinator(selector, getByteBuffers(), getThreadPool())
                 {
-                    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException
+                    public int doWrite(ByteBuffer buffer) throws RuntimeSocketClosedException
                     {
                         writes.incrementAndGet();
-                        return super.write(buffer);
+                        return super.doWrite(buffer);
                     }
 
                     public void needsWrite(boolean needsWrite)

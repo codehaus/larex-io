@@ -124,7 +124,7 @@ public class ClientClosesTest extends AbstractTestCase
                 return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                 {
                     @Override
-                    protected void onReadAction()
+                    protected void processOnRead()
                     {
                         // When a TCP packet is received by the client closed socket,
                         // the client closed socket sends a RST, which wakes up the
@@ -132,7 +132,7 @@ public class ClientClosesTest extends AbstractTestCase
                         // gives an IOException("Connection reset by peer");
                         try
                         {
-                            super.onReadAction();
+                            super.processOnRead();
                         }
                         catch (RuntimeIOException x)
                         {
@@ -163,7 +163,7 @@ public class ClientClosesTest extends AbstractTestCase
                             return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
-                                protected void onReadAction()
+                                protected void processOnRead()
                                 {
                                     ClientClosesTest.this.logger.debug("Step 1 releasing");
                                     latch1.countDown();
@@ -174,7 +174,7 @@ public class ClientClosesTest extends AbstractTestCase
                                         ClientClosesTest.this.logger.debug("Step 2 released");
                                         try
                                         {
-                                            super.onReadAction();
+                                            super.processOnRead();
                                         }
                                         catch (RuntimeSocketClosedException x)
                                         {
@@ -291,7 +291,7 @@ public class ClientClosesTest extends AbstractTestCase
                             return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
-                                protected void onReadAction()
+                                protected void processOnRead()
                                 {
                                     ClientClosesTest.this.logger.debug("Step 1 releasing");
                                     latch1.countDown();
@@ -300,7 +300,7 @@ public class ClientClosesTest extends AbstractTestCase
                                     {
                                         // Client reads normally since input has not been closed
                                         ClientClosesTest.this.logger.debug("Step 2 released");
-                                        super.onReadAction();
+                                        super.processOnRead();
                                     }
                                 }
                             };

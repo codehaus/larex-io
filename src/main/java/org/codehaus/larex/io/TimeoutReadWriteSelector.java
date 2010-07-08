@@ -29,7 +29,7 @@ public class TimeoutReadWriteSelector extends ReadWriteSelector implements Runna
 {
     private static final AtomicInteger ids = new AtomicInteger();
 
-    private final ConcurrentMap<TimeoutCoordinator, Boolean> timeouts = new ConcurrentHashMap<TimeoutCoordinator, Boolean>();
+    private final ConcurrentMap<Coordinator, Boolean> coordinators = new ConcurrentHashMap<Coordinator, Boolean>();
     private volatile long timerPeriod = 1000;
     private volatile boolean active;
     private volatile Thread thread;
@@ -64,16 +64,16 @@ public class TimeoutReadWriteSelector extends ReadWriteSelector implements Runna
     public void register(Channel channel, Listener listener)
     {
         super.register(channel, listener);
-        if (listener instanceof TimeoutCoordinator)
-            timeouts.put((TimeoutCoordinator)listener, Boolean.TRUE);
+        if (listener instanceof Coordinator)
+            coordinators.put((Coordinator)listener, Boolean.TRUE);
     }
 
     @Override
     public void unregister(Channel channel, Listener listener)
     {
         super.unregister(channel, listener);
-        if (listener instanceof TimeoutCoordinator)
-            timeouts.remove(listener);
+        if (listener instanceof Coordinator)
+            coordinators.remove(listener);
     }
 
     @Override
@@ -100,13 +100,13 @@ public class TimeoutReadWriteSelector extends ReadWriteSelector implements Runna
             {
                 TimeUnit.MILLISECONDS.sleep(getTimerPeriod());
 
-                Set<TimeoutCoordinator> timeouts = this.timeouts.keySet();
+                Set<Coordinator> coordinators = this.coordinators.keySet();
                 if (logger.isDebugEnabled())
-                    logger.debug("Timer checking {} connections", timeouts.size());
-                for (TimeoutCoordinator timeout : timeouts)
+                    logger.debug("Timer checking {} connections", coordinators.size());
+                for (Coordinator coordinator : coordinators)
                 {
-                    timeout.timeoutRead();
-                    timeout.timeoutWrite();
+                    coordinator.timeoutRead();
+                    coordinator.timeoutWrite();
                 }
             }
         }

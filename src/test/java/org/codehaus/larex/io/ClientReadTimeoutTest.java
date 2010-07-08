@@ -38,10 +38,10 @@ public class ClientReadTimeoutTest extends AbstractTestCase
         InetSocketAddress address = new InetSocketAddress("localhost", 0);
         ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool());
         int port = serverConnector.listen();
+
         try
         {
             final long timerPeriod = 1000;
-            final CountDownLatch timeoutLatch = new CountDownLatch(1);
             ClientConnector connector = new ClientConnector(getThreadPool())
             {
                 @Override
@@ -54,8 +54,10 @@ public class ClientReadTimeoutTest extends AbstractTestCase
                 }
             };
             connector.open();
+
             try
             {
+                final CountDownLatch timeoutLatch = new CountDownLatch(1);
                 Endpoint<StandardConnection> endpoint = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
                 {
                     public StandardConnection newConnection(Controller controller)
@@ -73,6 +75,7 @@ public class ClientReadTimeoutTest extends AbstractTestCase
                 int readTimeout = 1000;
                 endpoint.setReadTimeout(readTimeout);
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
+                
                 try
                 {
                     assertTrue(timeoutLatch.await(readTimeout * 2 + timerPeriod, TimeUnit.MILLISECONDS));
