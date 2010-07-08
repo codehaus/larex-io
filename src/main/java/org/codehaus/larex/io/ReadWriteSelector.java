@@ -233,7 +233,7 @@ public class ReadWriteSelector implements Selector
             Listener listener = (Listener)selectedKey.attachment();
             listener.onReadReady();
         }
-        else if (selectedKey.isWritable())
+        if (selectedKey.isWritable())
         {
             Listener listener = (Listener)selectedKey.attachment();
             listener.onWriteReady();
