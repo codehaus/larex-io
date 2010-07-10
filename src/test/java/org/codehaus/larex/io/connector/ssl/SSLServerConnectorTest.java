@@ -117,7 +117,7 @@ public class SSLServerConnectorTest extends AbstractTestCase
         SSLSocket sslSocket = (SSLSocket)sslContext.getSocketFactory().createSocket(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), true);
         sslSocket.startHandshake();
 
-        // Send something, wait for echo, then abruptly close
+        // Send something, wait for echo, then close
         String clientMessage = "clientMessage";
         OutputStream output = sslSocket.getOutputStream();
         output.write(clientMessage.getBytes("UTF-8"));
