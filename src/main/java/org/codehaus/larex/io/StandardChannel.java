@@ -284,7 +284,14 @@ public class StandardChannel implements Channel, Runnable
         {
             try
             {
-                selectionKey = channel.register(selector, 0, listener);
+                // Initial interest operations is 0, because we want to dispatch
+                // an open event before any read event.
+                // Open events are submitted to a thread pool and may arrive later
+                // than a read event if the other peer writes just after the connection
+                // is established, and a read-before-open event is particularly bad for SSL.
+                int interestOps = 0;
+                selectionKey = channel.register(selector, interestOps, listener);
+                StandardChannel.this.interestOps = interestOps;
                 listener.onOpen();
             }
             catch (ClosedChannelException x)

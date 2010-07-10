@@ -19,9 +19,6 @@ package org.codehaus.larex.io;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-/**
- * @version $Revision$ $Date$
- */
 public class StandardConnection extends FlushableConnection
 {
     private final CountDownLatch ready = new CountDownLatch(1);
@@ -29,12 +26,6 @@ public class StandardConnection extends FlushableConnection
     public StandardConnection(Controller controller)
     {
         super(controller);
-    }
-
-    void doOnPrepare()
-    {
-        super.doOnPrepare();
-        getController().needsRead(true);
     }
 
     @Override
@@ -51,6 +42,7 @@ public class StandardConnection extends FlushableConnection
 
     public static class Factory implements ConnectionFactory<StandardConnection>
     {
+        @Override
         public StandardConnection newConnection(Controller controller)
         {
             return new StandardConnection(controller);

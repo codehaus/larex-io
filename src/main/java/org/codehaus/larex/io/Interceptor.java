@@ -21,16 +21,11 @@ import java.nio.ByteBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * @version $Revision$ $Date$
- */
 public interface Interceptor
 {
     Interceptor getNext();
 
     void setNext(Interceptor interceptor);
-
-    void onPrepare();
 
     void onOpen();
 
@@ -57,66 +52,73 @@ public interface Interceptor
         protected final Logger logger = LoggerFactory.getLogger(getClass());
         private volatile Interceptor next;
 
+        @Override
         public Interceptor getNext()
         {
             return next;
         }
 
+        @Override
         public void setNext(Interceptor next)
         {
             this.next = next;
         }
 
-        public void onPrepare()
-        {
-            getNext().onPrepare();
-        }
-
+        @Override
         public void onOpen()
         {
             getNext().onOpen();
         }
 
+        @Override
         public void onReadTimeout()
         {
             getNext().onReadTimeout();
         }
 
+        @Override
         public boolean onRead(ByteBuffer buffer)
         {
             return getNext().onRead(buffer);
         }
 
+        @Override
         public void onWrite()
         {
             getNext().onWrite();
         }
 
+        @Override
         public void onWriteTimeout()
         {
             getNext().onWriteTimeout();
         }
 
+        @Override
         public int write(ByteBuffer buffer)
         {
             return getNext().write(buffer);
         }
 
+        @Override
         public void onRemoteClose()
         {
             getNext().onRemoteClose();
         }
 
+        @Override
         public void onClosing(StreamType type)
         {
             getNext().onClosing(type);
         }
 
+        @Override
         public void onClosed(StreamType type)
         {
             getNext().onClosed(type);
         }
 
+        @Override
         public void close(StreamType type)
         {
             getNext().close(type);

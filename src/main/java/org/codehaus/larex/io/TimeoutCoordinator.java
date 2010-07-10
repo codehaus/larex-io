@@ -37,11 +37,10 @@ public class TimeoutCoordinator extends StandardCoordinator
     }
 
     @Override
-    public void needsRead(boolean needsRead)
+    protected void processOnOpen()
     {
-        if (readTime == 0L && needsRead)
-            readTime = now();
-        super.needsRead(needsRead);
+        super.processOnOpen();
+        readTime = now();
     }
 
     @Override

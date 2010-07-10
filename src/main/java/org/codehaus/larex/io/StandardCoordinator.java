@@ -123,13 +123,13 @@ public class StandardCoordinator implements Coordinator
     @Override
     public void onOpen()
     {
-        getInterceptor().onPrepare(); // TODO: is this needed ?
         getThreadPool().execute(onOpenAction);
     }
 
     protected void processOnOpen()
     {
         getInterceptor().onOpen();
+        needsRead(true);
     }
 
     @Override
@@ -144,6 +144,8 @@ public class StandardCoordinator implements Coordinator
 
     protected void processOnRead()
     {
+        boolean debug = logger.isDebugEnabled();
+
         int read;
         int totalRead = 0;
         boolean closed;
@@ -166,7 +168,7 @@ public class StandardCoordinator implements Coordinator
 
                 if (read > 0)
                 {
-                    if (logger.isDebugEnabled())
+                    if (debug)
                         logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
                     buffer.flip();
                     readMore = onRead(buffer);
@@ -187,7 +189,7 @@ public class StandardCoordinator implements Coordinator
 
         if (closed)
         {
-            if (logger.isDebugEnabled())
+            if (debug)
                 logger.debug("Channel {} closed remotely", getChannel());
             onRemoteClose();
         }
@@ -402,12 +404,6 @@ public class StandardCoordinator implements Coordinator
         }
 
         @Override
-        public void onPrepare()
-        {
-            getConnection().prepareEvent();
-        }
-
-        @Override
         public void onOpen()
         {
             try
@@ -416,7 +412,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
@@ -429,7 +425,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
@@ -442,7 +438,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
                 return true;
             }
         }
@@ -456,7 +452,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
@@ -469,7 +465,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 

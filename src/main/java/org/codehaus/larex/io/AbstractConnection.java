@@ -18,25 +18,8 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 
-/**
- * @version $Revision$ $Date$
- */
 public class AbstractConnection implements Connection
 {
-    public final void prepareEvent()
-    {
-        doOnPrepare();
-        onPrepare();
-    }
-
-    void doOnPrepare()
-    {
-    }
-
-    protected void onPrepare()
-    {
-    }
-
     public final void openEvent()
     {
         doOnOpen();
