@@ -29,9 +29,6 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @version $Revision$ $Date$
- */
 public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
 {
     @Test
@@ -65,43 +62,44 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
             final CountDownLatch latch = new CountDownLatch(1);
             ClientConnector connector = new ClientConnector(getThreadPool());
             connector.open();
+
             try
             {
                 StandardConnection connection = connector.newEndpoint(new ConnectionFactory<StandardConnection>()
+                {
+                    public StandardConnection newConnection(Controller controller)
                     {
-                        public StandardConnection newConnection(Controller controller)
+                        return new StandardConnection(controller)
                         {
-                            return new StandardConnection(controller)
+                            @Override
+                            protected boolean onRead(ByteBuffer buffer)
                             {
-                                @Override
-                                protected boolean onRead(ByteBuffer buffer)
-                                {
-                                    if (!tester.compareAndSet(0, 1))
-                                        failure.set(1);
-                                    return true;
-                                }
+                                if (!tester.compareAndSet(0, 1))
+                                    failure.set(1);
+                                return true;
+                            }
 
-                                @Override
-                                public void onRemoteClose()
-                                {
-                                    if (!tester.compareAndSet(1, 2))
-                                        failure.set(2);
-                                    latch.countDown();
-                                }
-                            };
-                        }
-                    }).connect(new InetSocketAddress(address.getHostName(), port));
+                            @Override
+                            public void onRemoteClose()
+                            {
+                                if (!tester.compareAndSet(1, 2))
+                                    failure.set(2);
+                                latch.countDown();
+                            }
+                        };
+                    }
+                }).connect(new InetSocketAddress(address.getHostName(), port));
 
                 try
-                    {
-                        assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
-                        assertEquals(2, tester.get());
-                        assertEquals(0, failure.get());
-                    }
-                    finally
-                    {
-                        connection.close();
-                    }
+                {
+                    assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
+                    assertEquals(2, tester.get());
+                    assertEquals(0, failure.get());
+                }
+                finally
+                {
+                    connection.close();
+                }
             }
             finally
             {
