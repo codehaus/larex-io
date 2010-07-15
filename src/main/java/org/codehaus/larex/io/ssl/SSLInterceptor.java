@@ -50,13 +50,6 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public void onPrepare()
-    {
-        super.onPrepare();
-        controller.needsRead(false);
-    }
-
-    @Override
     public void onOpen()
     {
         try
@@ -81,9 +74,8 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     }
                     case NEED_UNWRAP:
                     {
-                        // We are done with sending, break out to read
-                        controller.needsRead(true);
-                        break out;
+                        // We are done with sending, read response
+                        return;
                     }
                     default:
                         throw new IllegalStateException();
