@@ -94,8 +94,7 @@ public abstract class ClosableConnection extends AbstractConnection
      */
     public final void close()
     {
-        doClose(StreamType.INPUT_OUTPUT);
-        getController().close(StreamType.INPUT_OUTPUT);
+        close(StreamType.INPUT_OUTPUT);
     }
 
     /**
