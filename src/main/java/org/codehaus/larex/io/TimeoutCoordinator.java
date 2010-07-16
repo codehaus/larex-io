@@ -59,7 +59,7 @@ public class TimeoutCoordinator extends StandardCoordinator
             long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - readTime);
             if (elapsed > readTimeout)
             {
-                getThreadPool().execute(new Runnable()
+                dispatch(new Runnable()
                 {
                     public void run()
                     {
@@ -93,7 +93,7 @@ public class TimeoutCoordinator extends StandardCoordinator
             long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - writeTime);
             if (elapsed > writeTimeout)
             {
-                getThreadPool().execute(new Runnable()
+                dispatch(new Runnable()
                 {
                     public void run()
                     {

@@ -19,6 +19,7 @@ package org.codehaus.larex.io;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,7 +124,7 @@ public class StandardCoordinator implements Coordinator
     @Override
     public void onOpen()
     {
-        getThreadPool().execute(onOpenAction);
+        dispatch(onOpenAction);
     }
 
     protected void processOnOpen()
@@ -139,7 +140,7 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to read
         needsRead(false);
         // Dispatch the read to another thread
-        getThreadPool().execute(onReadAction);
+        dispatch(onReadAction);
     }
 
     protected void processOnRead()
@@ -219,7 +220,7 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
-        getThreadPool().execute(onWriteAction);
+        dispatch(onWriteAction);
     }
 
     protected void processOnWrite()
@@ -240,7 +241,7 @@ public class StandardCoordinator implements Coordinator
     @Override
     public void onClose()
     {
-        getThreadPool().execute(onCloseAction);
+        dispatch(onCloseAction);
     }
 
     protected void processOnClose()
@@ -326,6 +327,18 @@ public class StandardCoordinator implements Coordinator
     protected Interceptor getInterceptor()
     {
         return headInterceptor;
+    }
+
+    protected void dispatch(Runnable action)
+    {
+        try
+        {
+            getThreadPool().execute(action);
+        }
+        catch (RejectedExecutionException x)
+        {
+            logger.debug("", x);
+        }
     }
 
     private class OnOpenAction implements Runnable
