@@ -190,9 +190,20 @@ public class StandardCoordinator implements Coordinator
 
         if (closed)
         {
-            if (debug)
-                logger.debug("Channel {} closed remotely", getChannel());
-            onRemoteClose();
+            // If the input is closed by user code, reading returns -1,
+            // but that's different from a remote close
+            if (channel.isClosed(StreamType.INPUT))
+            {
+                if (debug)
+                    logger.debug("Channel {} closed locally", getChannel());
+            }
+            else
+            {
+                if (debug)
+                    logger.debug("Channel {} closed remotely", getChannel());
+                onRemoteClose();
+            }
+            needsRead(false);
         }
         else
         {
