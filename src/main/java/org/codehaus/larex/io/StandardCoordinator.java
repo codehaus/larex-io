@@ -19,6 +19,7 @@ package org.codehaus.larex.io;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,13 +124,13 @@ public class StandardCoordinator implements Coordinator
     @Override
     public void onOpen()
     {
-        getInterceptor().onPrepare(); // TODO: is this needed ?
-        getThreadPool().execute(onOpenAction);
+        dispatch(onOpenAction);
     }
 
     protected void processOnOpen()
     {
         getInterceptor().onOpen();
+        needsRead(true);
     }
 
     @Override
@@ -139,11 +140,13 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to read
         needsRead(false);
         // Dispatch the read to another thread
-        getThreadPool().execute(onReadAction);
+        dispatch(onReadAction);
     }
 
     protected void processOnRead()
     {
+        boolean debug = logger.isDebugEnabled();
+
         int read;
         int totalRead = 0;
         boolean closed;
@@ -166,7 +169,7 @@ public class StandardCoordinator implements Coordinator
 
                 if (read > 0)
                 {
-                    if (logger.isDebugEnabled())
+                    if (debug)
                         logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
                     buffer.flip();
                     readMore = onRead(buffer);
@@ -187,9 +190,20 @@ public class StandardCoordinator implements Coordinator
 
         if (closed)
         {
-            if (logger.isDebugEnabled())
-                logger.debug("Channel {} closed remotely", getChannel());
-            onRemoteClose();
+            // If the input is closed by user code, reading returns -1,
+            // but that's different from a remote close
+            if (channel.isClosed(StreamType.INPUT))
+            {
+                if (debug)
+                    logger.debug("Channel {} closed locally", getChannel());
+            }
+            else
+            {
+                if (debug)
+                    logger.debug("Channel {} closed remotely", getChannel());
+                onRemoteClose();
+            }
+            needsRead(false);
         }
         else
         {
@@ -217,7 +231,7 @@ public class StandardCoordinator implements Coordinator
         // continue to notify us that it is ready to write
         needsWrite(false);
         // Notify the suspended thread that it can write some more
-        getThreadPool().execute(onWriteAction);
+        dispatch(onWriteAction);
     }
 
     protected void processOnWrite()
@@ -238,7 +252,7 @@ public class StandardCoordinator implements Coordinator
     @Override
     public void onClose()
     {
-        getThreadPool().execute(onCloseAction);
+        dispatch(onCloseAction);
     }
 
     protected void processOnClose()
@@ -326,6 +340,18 @@ public class StandardCoordinator implements Coordinator
         return headInterceptor;
     }
 
+    protected void dispatch(Runnable action)
+    {
+        try
+        {
+            getThreadPool().execute(action);
+        }
+        catch (RejectedExecutionException x)
+        {
+            logger.debug("", x);
+        }
+    }
+
     private class OnOpenAction implements Runnable
     {
         @Override
@@ -402,12 +428,6 @@ public class StandardCoordinator implements Coordinator
         }
 
         @Override
-        public void onPrepare()
-        {
-            getConnection().prepareEvent();
-        }
-
-        @Override
         public void onOpen()
         {
             try
@@ -416,7 +436,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
@@ -429,7 +449,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
@@ -442,7 +462,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
                 return true;
             }
         }
@@ -456,7 +476,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
@@ -469,7 +489,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.debug("Unexpected exception", x);
+                logger.info("Unexpected exception", x);
             }
         }
 
