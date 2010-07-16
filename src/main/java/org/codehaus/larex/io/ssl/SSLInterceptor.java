@@ -29,9 +29,6 @@ import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.codehaus.larex.io.StreamType;
 
-/**
- * @version $Revision$ $Date$
- */
 public class SSLInterceptor extends Interceptor.Forwarder
 {
     private final ByteBuffers sslByteBuffers;
@@ -57,14 +54,14 @@ public class SSLInterceptor extends Interceptor.Forwarder
             // Signal to the SSL engine that we're starting the handshake
             sslEngine.beginHandshake();
             SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
-            out: while (handshakeStatus != SSLEngineResult.HandshakeStatus.FINISHED)
+            while (handshakeStatus != SSLEngineResult.HandshakeStatus.FINISHED)
             {
-                logger.debug("Handshake status: {}", handshakeStatus);
+                logger.debug("Open handshake status: {}", handshakeStatus);
                 switch (handshakeStatus)
                 {
                     case NEED_WRAP:
                     {
-                        handshakeWrap();
+                        encryptSSL();
                         break;
                     }
                     case NEED_TASK:
@@ -111,12 +108,12 @@ public class SSLInterceptor extends Interceptor.Forwarder
             out: while (handshaking)
             {
                 SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
-                logger.debug("Handshake status: {}", handshakeStatus);
+                logger.debug("Read handshake status: {}", handshakeStatus);
                 switch (handshakeStatus)
                 {
                     case NEED_UNWRAP:
                     {
-                        if (handshakeUnwrap(sslBuffer, buffer))
+                        if (decryptSSL(sslBuffer, buffer))
                             break out;
                         break;
                     }
@@ -127,14 +124,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     }
                     case NEED_WRAP:
                     {
-                        handshakeWrap();
-                        break out;
-                    }
-                    case NOT_HANDSHAKING:
-                    {
-                        handshaking = false;
-                        // TLS handshake completed, now we are ready
-                        super.onOpen();
+                        encryptSSL();
                         break out;
                     }
                     default:
@@ -145,7 +135,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
             if (handshaking)
                 return true;
 
-            return wrap(sslBuffer, buffer);
+            return decryptData(sslBuffer, buffer);
         }
         catch (SSLException x)
         {
@@ -158,7 +148,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         }
     }
 
-    private boolean wrap(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
+    private boolean decryptData(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
     {
         boolean readMore = true;
         int bufferSize = sslEngine.getSession().getApplicationBufferSize();
@@ -166,9 +156,9 @@ public class SSLInterceptor extends Interceptor.Forwarder
         {
             ByteBuffer source = fillLocal(sslBuffer);
 
-            logger.debug("Wrapping from {} to {}", source, buffer);
+            logger.debug("Decrypting from {} to {}", source, buffer);
             SSLEngineResult result = sslEngine.unwrap(source, buffer);
-            logger.debug("Wrapped from {} to {}, result {}", new Object[]{source, buffer, result});
+            logger.debug("Decrypted from {} to {}, result {}", new Object[]{source, buffer, result});
             switch (result.getStatus())
             {
                 case OK:
@@ -176,6 +166,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     // Prepare for read
                     buffer.flip();
                     // Forward the call with the unencrypted bytes
+                    logger.debug("Forwarding read event of {} bytes", buffer.remaining());
                     readMore = super.onRead(buffer);
                     // Cleanup the buffer
                     buffer.clear();
@@ -196,7 +187,11 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 }
                 case CLOSED:
                 {
-                    handshakeWrap();
+                    // We were expecting data from the remote peer, we got a
+                    // close message instead, forward the remote close event
+                    logger.debug("Forwarding remote close event");
+                    super.onRemoteClose();
+                    encryptSSL();
                     break out;
                 }
                 default:
@@ -270,16 +265,14 @@ public class SSLInterceptor extends Interceptor.Forwarder
     {
         try
         {
-            sslEngine.closeInbound();
-            assert sslEngine.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING;
-            super.onRemoteClose();
+            closeSSLInput();
         }
         catch (SSLException x)
         {
             // Could be a truncation attack where a man in the middle
             // truncates the message then sends a FIN.
-            // Do not signal to the application that the connection was
-            // orderly closed by the remote peer.
+            // Do not forward the remote close event, since the connection
+            // was not orderly closed by the remote peer.
             logger.debug("", x);
         }
     }
@@ -287,8 +280,44 @@ public class SSLInterceptor extends Interceptor.Forwarder
     @Override
     public void close(StreamType type)
     {
-        // TODO: handle stream types
+        logger.debug("Closing {}", type);
+        switch (type)
+        {
+            case INPUT:
+            {
+                // SSLEngine.closeInbound() can only be called after receiving
+                // the remote peer SSL close message, so we just forward the close
+                break;
+            }
+            case OUTPUT:
+            case INPUT_OUTPUT:
+            {
+                try
+                {
+                    closeSSLOutput();
+                    break;
+                }
+                catch (SSLException x)
+                {
+                    throw new RuntimeIOException(x);
+                }
+            }
+            default:
+                throw new IllegalStateException();
+        }
+        super.close(type);
+    }
 
+    protected void closeSSLInput() throws SSLException
+    {
+        sslEngine.closeInbound();
+        SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
+        logger.debug("Close inbound handshake status: {}", handshakeStatus);
+        assert handshakeStatus == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING : handshakeStatus;
+    }
+
+    protected void closeSSLOutput() throws SSLException
+    {
         ByteBuffer sslBuffer = sslByteBuffers.acquire(sslEngine.getSession().getPacketBufferSize(), false);
         try
         {
@@ -296,16 +325,21 @@ public class SSLInterceptor extends Interceptor.Forwarder
             SSLEngineResult.HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
             out: while (handshakeStatus != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING)
             {
+                logger.debug("Close outbound handshake status: {}", handshakeStatus);
                 switch (handshakeStatus)
                 {
                     case NEED_WRAP:
                     {
-                        handshakeWrap();
+                        encryptSSL();
                         break;
                     }
                     case NEED_UNWRAP:
                     {
-                        super.close(type);
+                        // The TLS specification allows the initiator of the close to
+                        // close the connection without reading the peer response.
+                        // This is good because otherwise we would need to put this
+                        // thread in wait, read the response, then call super.close()
+                        // which would be more complicated.
                         break out;
                     }
                     default:
@@ -313,10 +347,6 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 }
                 handshakeStatus = sslEngine.getHandshakeStatus();
             }
-        }
-        catch (SSLException x)
-        {
-            throw new RuntimeIOException(x);
         }
         finally
         {
@@ -331,13 +361,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         ByteBuffer sslBuffer = sslByteBuffers.acquire(sslBufferSize, false);
         try
         {
-            SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
-            logger.debug("Wrapping result: {}", result);
-            assert result.getStatus() == SSLEngineResult.Status.OK;
-            sslBuffer.flip();
-            int length = sslBuffer.remaining();
-            flush(sslBuffer);
-            return length;
+            return encryptData(buffer, sslBuffer);
         }
         catch (SSLException x)
         {
@@ -350,61 +374,99 @@ public class SSLInterceptor extends Interceptor.Forwarder
         }
     }
 
-    private boolean handshakeUnwrap(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
+    private int encryptData(ByteBuffer buffer, ByteBuffer sslBuffer) throws SSLException
+    {
+        logger.debug("Encrypting from {} to {}", buffer, sslBuffer);
+        SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
+        logger.debug("Encrypted from {} to {}, result {}", new Object[]{buffer, sslBuffer, result});
+
+        SSLEngineResult.Status status = result.getStatus();
+        assert status == SSLEngineResult.Status.OK || status == SSLEngineResult.Status.CLOSED : status;
+
+        // Either we have encrypted data in the buffer, or we have generated the close message
+        int written = 0;
+        if (result.bytesProduced() > 0)
+        {
+            sslBuffer.flip();
+            written = sslBuffer.remaining();
+            flush(sslBuffer);
+        }
+
+        if (status == SSLEngineResult.Status.CLOSED && result.bytesConsumed() == 0 && buffer.hasRemaining())
+        {
+            // Trying to write after the SSL engine has received the close message
+            // This is currently not supported by the SSL engine
+            throw new RuntimeSocketClosedException("Writing data on a closed SSLEngine is not supported");
+        }
+
+        return written;
+    }
+
+    private boolean decryptSSL(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
     {
         logger.debug("Handshake reading from {}", sslBuffer);
 
         // If we have a previous unfinished read, coalesce it
         ByteBuffer source = fillLocal(sslBuffer);
 
-        while (source.hasRemaining())
+        out: while (source.hasRemaining())
         {
-            logger.debug("Handshake unwrapping from {} to {}", source, buffer);
+            logger.debug("Handshake decrypting from {} to {}", source, buffer);
             SSLEngineResult result = sslEngine.unwrap(source, buffer);
-            logger.debug("Handshake unwrapped from {} to {}, result {}", new Object[]{source, buffer, result});
+            logger.debug("Handshake decrypted from {} to {}, result {}", new Object[]{source, buffer, result});
             switch (result.getStatus())
             {
                 case OK:
                 {
-                    // Everything is unwrapped, we're done
+                    // Everything is decrypted, we're done
                     resetLocal();
                     break;
                 }
                 case BUFFER_UNDERFLOW:
                 {
                     prepareLocal(sslBuffer);
-                    break;
+                    break out;
                 }
                 case CLOSED:
                 {
-                    // We have unwrapped a close SSL message, just break
+                    // We have decrypted an SSL close message, just break
                     break;
                 }
                 default:
                     throw new IllegalStateException();
             }
-            if (result.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_UNWRAP)
+            SSLEngineResult.HandshakeStatus handshakeStatus = result.getHandshakeStatus();
+            if (handshakeStatus == SSLEngineResult.HandshakeStatus.FINISHED)
+            {
+                handshaking = false;
+                logger.debug("Handshake finished (client), forwarding open event");
+                super.onOpen();
+            }
+            if (handshakeStatus != SSLEngineResult.HandshakeStatus.NEED_UNWRAP)
                 return false;
         }
         return true;
     }
 
-    private void handshakeWrap() throws SSLException
+    private void encryptSSL() throws SSLException
     {
         int sslBufferSize = sslEngine.getSession().getPacketBufferSize();
         ByteBuffer sslBuffer = sslByteBuffers.acquire(sslBufferSize, false);
         try
         {
-            // During handshake wrapping there is nothing to send
+            // During handshake encryption there is nothing to send
             ByteBuffer buffer = ByteBuffer.allocate(0);
             while (true)
             {
                 sslBuffer.clear();
                 sslBuffer.limit(sslBufferSize);
-                logger.debug("Handshake wrapping to {}", sslBuffer);
+                logger.debug("Handshake encrypting to {}", sslBuffer);
                 SSLEngineResult result = sslEngine.wrap(buffer, sslBuffer);
-                logger.debug("Handshake wrapped to {}, result {}", sslBuffer, result);
-                assert result.getStatus() == SSLEngineResult.Status.OK || result.getStatus() == SSLEngineResult.Status.CLOSED;
+                logger.debug("Handshake encrypted to {}, result {}", sslBuffer, result);
+                SSLEngineResult.Status status = result.getStatus();
+                assert status == SSLEngineResult.Status.OK || status == SSLEngineResult.Status.CLOSED : status;
+                // TODO: optimize buffering into the sslBuffer before flushing: the handshake produces
+                // TODO: multiple small packets looping here, so we may slow down because of Nagle
                 sslBuffer.flip();
                 try
                 {
@@ -415,7 +477,14 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     if (result.getStatus() != SSLEngineResult.Status.CLOSED)
                         throw x;
                 }
-                if (result.getHandshakeStatus() != SSLEngineResult.HandshakeStatus.NEED_WRAP)
+                SSLEngineResult.HandshakeStatus handshakeStatus = result.getHandshakeStatus();
+                if (handshakeStatus == SSLEngineResult.HandshakeStatus.FINISHED)
+                {
+                    handshaking = false;
+                    logger.debug("Handshake finished (server), forwarding open event");
+                    super.onOpen();
+                }
+                if (handshakeStatus != SSLEngineResult.HandshakeStatus.NEED_WRAP)
                     break;
             }
         }
