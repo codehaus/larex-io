@@ -465,8 +465,6 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 logger.debug("Handshake encrypted to {}, result {}", sslBuffer, result);
                 SSLEngineResult.Status status = result.getStatus();
                 assert status == SSLEngineResult.Status.OK || status == SSLEngineResult.Status.CLOSED : status;
-                // TODO: optimize buffering into the sslBuffer before flushing: the handshake produces
-                // TODO: multiple small packets looping here, so we may slow down because of Nagle
                 sslBuffer.flip();
                 try
                 {
