@@ -20,12 +20,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -45,6 +47,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class SSLClientConnectorTest extends AbstractTestCase
 {
@@ -467,6 +470,112 @@ public class SSLClientConnectorTest extends AbstractTestCase
         {
             connector.close();
             connector.join(1000);
+        }
+    }
+
+    @Test
+    public void testHandshakeThenClientWritesThenServerEchoesThenClientClosesOutput() throws Exception
+    {
+        SSLContext sslContext = clientConnector.getSSLContext();
+
+        final String clientMessage = "clientMessage";
+        final String serverMessage = "serverMessage";
+        final CountDownLatch serverRemoteCloseLatch = new CountDownLatch(1);
+        final SSLServerSocket sslServerSocket = (SSLServerSocket)sslContext.getServerSocketFactory().createServerSocket(0);
+        Thread acceptor = new Thread()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    SSLSocket sslSocket = (SSLSocket)sslServerSocket.accept();
+                    sslSocket.setUseClientMode(false);
+                    sslSocket.startHandshake();
+
+                    InputStream input = sslSocket.getInputStream();
+                    byte[] buffer = new byte[clientMessage.length()];
+                    int read = input.read(buffer);
+                    assertEquals(clientMessage.length(), read);
+
+                    OutputStream output = sslSocket.getOutputStream();
+                    output.write(clientMessage.getBytes("UTF-8"));
+                    output.flush();
+
+                    // Client has closed
+                    read = input.read();
+                    assertEquals(-1, read);
+
+                    try
+                    {
+                        // SSL engine does not support writing after a remote close
+                        output.write(serverMessage.getBytes("UTF-8"));
+                        fail();
+                    }
+                    catch (SocketException x)
+                    {
+                        sslSocket.close();
+                        serverRemoteCloseLatch.countDown();
+                    }
+                }
+                catch (IOException x)
+                {
+                    x.printStackTrace();
+                }
+            }
+        };
+        acceptor.start();
+
+        try
+        {
+            final AtomicReference<ByteBuffer> message = new AtomicReference<ByteBuffer>();
+            final CountDownLatch readLatch = new CountDownLatch(1);
+            final CountDownLatch clientRemoteCloseLatch = new CountDownLatch(1);
+            SSLEndpoint<StandardConnection> sslEndpoint = clientConnector.newEndpoint(new ConnectionFactory<StandardConnection>()
+            {
+                @Override
+                public StandardConnection newConnection(Controller controller)
+                {
+                    return new StandardConnection(controller)
+                    {
+                        @Override
+                        protected boolean onRead(ByteBuffer buffer)
+                        {
+                            if (readLatch.getCount() == 1)
+                            {
+                                message.set(ByteBuffer.allocate(buffer.remaining()).put(buffer));
+                                readLatch.countDown();
+                            }
+                            return true;
+                        }
+
+                        @Override
+                        protected void onRemoteClose()
+                        {
+                            clientRemoteCloseLatch.countDown();
+                        }
+                    };
+                }
+            });
+            StandardConnection connection = sslEndpoint.connect(new InetSocketAddress("localhost", sslServerSocket.getLocalPort()));
+            assertTrue(connection.awaitReady(1000));
+
+            connection.flush(Charset.forName("UTF-8").encode(clientMessage));
+
+            assertTrue(readLatch.await(1000, TimeUnit.MILLISECONDS));
+            assertNotNull(message.get());
+            assertEquals(clientMessage, Charset.forName("UTF-8").decode((ByteBuffer)message.get().flip()).toString());
+
+            // Close output; the server will try to write one more message, but will fail
+            connection.close(StreamType.OUTPUT);
+            assertTrue(serverRemoteCloseLatch.await(1000, TimeUnit.MILLISECONDS));
+
+            // The server has closed, we should read -1
+            assertTrue(clientRemoteCloseLatch.await(1000, TimeUnit.MILLISECONDS));
+        }
+        finally
+        {
+            clientConnector.close();
         }
     }
 }
