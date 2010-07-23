@@ -92,15 +92,16 @@ public class ReadWriteSelector implements Selector
         if (Thread.currentThread() != thread)
         {
             tasks.add(task);
-            logger.debug("Added task {}", task);
-            if (needsWakeup)
+            boolean wakeup = needsWakeup;
+            if (wakeup)
                 wakeup();
+            logger.debug("Added task {}, woken up: {}", task, wakeup);
         }
         else
         {
             runTasks();
             runTask(task);
-            logger.debug("Avoided wakeup for task {}", task);
+            logger.debug("Run task {}, woken up: false", task);
         }
     }
 
