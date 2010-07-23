@@ -37,7 +37,7 @@ public class ReadWriteSelector implements Selector
     private final Queue<Runnable> tasks = new ConcurrentLinkedQueue<Runnable>();
     private volatile java.nio.channels.Selector selector;
     private volatile Thread thread;
-    private volatile boolean needsWakeup;
+    private volatile boolean needsWakeup = true;
 
     public void open()
     {
@@ -232,12 +232,13 @@ public class ReadWriteSelector implements Selector
     {
         try
         {
-            if (selectedKey.isReadable())
+            int readyOps = selectedKey.readyOps();
+            if ((readyOps & SelectionKey.OP_READ) != 0)
             {
                 Listener listener = (Listener)selectedKey.attachment();
                 listener.onReadReady();
             }
-            if (selectedKey.isWritable())
+            if ((readyOps & SelectionKey.OP_WRITE) != 0)
             {
                 Listener listener = (Listener)selectedKey.attachment();
                 listener.onWriteReady();
