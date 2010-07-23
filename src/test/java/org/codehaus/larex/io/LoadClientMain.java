@@ -27,8 +27,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -58,8 +59,8 @@ public class LoadClientMain
     public void run() throws Exception
     {
         int maxThreads = 500;
-        ExecutorService threadPool = new ThreadPoolExecutor(0, maxThreads, 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<Runnable>(), new CallerBlocksPolicy());
+        ExecutorService threadPool = new ThreadPoolExecutor(maxThreads, maxThreads, 60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<Runnable>(), new CallerBlocksPolicy());
 
         ClientConnector connector = new ClientConnector(threadPool);
         connector.open();
@@ -86,6 +87,15 @@ public class LoadClientMain
         long batchPause = 5;
         int requestSize = 50;
 
+        ConnectionFactory<LatencyConnection> connectionFactory = new ConnectionFactory<LatencyConnection>()
+        {
+            public LatencyConnection newConnection(Controller controller)
+            {
+                return new LatencyConnection(controller);
+            }
+        };
+        InetSocketAddress address = new InetSocketAddress(host, port);
+
         while (true)
         {
             System.err.println("-----");
@@ -101,35 +111,32 @@ public class LoadClientMain
 
             System.err.println("Waiting for connections to be ready...");
 
-            ConnectionFactory<LatencyConnection> connectionFactory = new ConnectionFactory<LatencyConnection>()
-            {
-                public LatencyConnection newConnection(Controller controller)
-                {
-                    return new LatencyConnection(controller);
-                }
-            };
-            InetSocketAddress address = new InetSocketAddress(host, port);
-
             // Create or remove the necessary connections
             int currentConnections = this.connections.size();
-            if (currentConnections < connections)
+            while (currentConnections < connections)
             {
-                for (int i = 0; i < connections - currentConnections; ++i)
-                {
-                    LatencyConnection connection = connector.newEndpoint(connectionFactory).connect(address);
+                LatencyConnection connection = connector.newEndpoint(connectionFactory).connect(address);
+                if (connection.awaitReady(1000))
                     this.connections.add(connection);
-                }
-            }
-            else if (currentConnections > connections)
-            {
-                for (int i = 0; i < currentConnections - connections; ++i)
-                {
-                    LatencyConnection connection = this.connections.remove(currentConnections - i - 1);
-                    connection.close();
-                }
+                currentConnections = this.connections.size();
             }
 
-            System.err.println("Clients ready");
+            while (currentConnections > connections)
+            {
+                LatencyConnection connection = this.connections.remove(currentConnections - 1);
+                connection.close();
+                currentConnections = this.connections.size();
+            }
+
+            if (currentConnections == 0)
+            {
+                System.err.println("Clients disconnected");
+                break;
+            }
+            else
+            {
+                System.err.println("Clients ready");
+            }
 
             currentConnections = this.connections.size();
             if (currentConnections > 0)
@@ -152,6 +159,7 @@ public class LoadClientMain
                     value = "" + batchPause;
                 batchPause = Long.parseLong(value);
 
+                // TODO: too small, and we run into Nagle; too big and we run into Nagle + delayed acks
                 System.err.print("request size [" + requestSize + "]: ");
                 value = console.readLine().trim();
                 if (value.length() == 0)
@@ -163,7 +171,10 @@ public class LoadClientMain
                 byte[] content = requestBody.getBytes("UTF-8");
 
                 reset();
+                LatencyConnection statsConnection = this.connections.get(0);
+                statsConnection.send((byte)0x00, new byte[0]);
 
+                reset();
                 long start = System.nanoTime();
                 long expected = 0;
                 for (int i = 0; i < batchCount; ++i)
@@ -172,7 +183,7 @@ public class LoadClientMain
                     {
                         int clientIndex = random.nextInt(this.connections.size());
                         LatencyConnection connection = this.connections.get(clientIndex);
-                        connection.send(content);
+                        connection.send((byte)0x01, content);
                         ++expected;
                     }
 
@@ -191,9 +202,16 @@ public class LoadClientMain
                 }
 
                 waitForResponses(expected);
+                statsConnection.send((byte)0xFF, new byte[0]);
                 printReport(expected);
             }
         }
+
+        connector.close();
+        connector.join(1000);
+
+        threadPool.shutdown();
+        threadPool.awaitTermination(1000, TimeUnit.SECONDS);
     }
 
     private void reset()
@@ -326,8 +344,14 @@ public class LoadClientMain
 
     private class LatencyConnection extends StandardConnection
     {
-        private long time = 0;
-        private int timeBytes = 0;
+        private CountDownLatch latch;
+        private byte type;
+        private int typeBytes;
+        private long time;
+        private int timeBytes;
+        private int length;
+        private int lengthBytes;
+        private int contentLength;
 
         private LatencyConnection(Controller controller)
         {
@@ -340,46 +364,82 @@ public class LoadClientMain
             while (buffer.hasRemaining())
             {
                 byte currByte = buffer.get();
-                if (timeBytes < 8)
+
+                if (typeBytes < 1)
                 {
-                    long shifted = currByte & 0xFF;
-                    shifted <<= 8 * timeBytes;
-                    time += shifted;
-                    ++timeBytes;
+                    type = currByte;
+                    ++typeBytes;
+                    continue;
                 }
-                else
+                else if (timeBytes < 8)
                 {
-                    if (currByte == 0x7F)
+                    time <<= 8;
+                    time += currByte & 0xFF;
+                    ++timeBytes;
+                    continue;
+                }
+                else if (lengthBytes < 2)
+                {
+                    length <<= 8;
+                    length += currByte & 0xFF;
+                    ++lengthBytes;
+                    if (lengthBytes < 2)
+                        continue;
+                }
+
+                int size = Math.min(length - contentLength, buffer.remaining());
+                contentLength += size;
+                buffer.position(buffer.position() + size);
+
+                if (contentLength == length)
+                {
+                    if ((type & 0xFF) == 0x00 || (type & 0xFF) == 0xFF)
+                    {
+                        latch.countDown();
+                    }
+                    else
                     {
                         responses.incrementAndGet();
                         if (start.get() == 0L)
                             start.set(time);
                         end.set(time);
                         updateLatencies(time, System.nanoTime());
-                        time = 0;
-                        timeBytes = 0;
                     }
+
+                    latch = null;
+                    type = 0;
+                    typeBytes = 0;
+                    time = 0;
+                    timeBytes = 0;
+                    length = 0;
+                    lengthBytes = 0;
+                    contentLength = 0;
                 }
             }
+
             return true;
         }
 
-        public void send(byte[] content)
+        public void send(byte type, byte[] content) throws InterruptedException
         {
-            ByteBuffer buffer = ByteBuffer.allocate(8 + content.length + 1);
+            if ((type & 0xFF) == 0x00 || (type & 0xFF) == 0xFF)
+                latch = new CountDownLatch(1);
+
+            ByteBuffer buffer = ByteBuffer.allocate(1 + 8 + 2 + content.length);
             buffer.clear();
-            long time = System.nanoTime();
-            for (int k = 0; k < 8; ++k)
-            {
-                byte b = (byte)(time & 0xFF);
-                buffer.put(b);
-                time >>>= 8;
-            }
+
+            buffer.put(type);
+            buffer.putLong(System.nanoTime());
+            buffer.putShort((short)content.length);
             buffer.put(content);
-            buffer.put((byte)0x7F);
+
             buffer.flip();
 
             flush(buffer);
+
+            final CountDownLatch latch = this.latch;
+            if (latch != null)
+                latch.await();
         }
     }
 }
