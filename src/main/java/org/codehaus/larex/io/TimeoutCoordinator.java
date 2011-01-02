@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class TimeoutCoordinator extends StandardCoordinator
 {
+    private final Runnable readTimeoutAction = new ReadTimeoutAction();
+    private final Runnable writeTimeoutAction = new WriteTimeoutAction();
     private final AtomicReference<State> readState = new AtomicReference<State>(State.WAIT);
     private final AtomicReference<State> writeState = new AtomicReference<State>(State.WAIT);
     private final long readTimeout;
@@ -58,15 +60,7 @@ public class TimeoutCoordinator extends StandardCoordinator
         {
             long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - readTime);
             if (elapsed > readTimeout)
-            {
-                dispatch(new Runnable()
-                {
-                    public void run()
-                    {
-                        onReadTimeout();
-                    }
-                });
-            }
+                dispatch(readTimeoutAction);
         }
     }
 
@@ -92,15 +86,7 @@ public class TimeoutCoordinator extends StandardCoordinator
         {
             long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - writeTime);
             if (elapsed > writeTimeout)
-            {
-                dispatch(new Runnable()
-                {
-                    public void run()
-                    {
-                        onWriteTimeout();
-                    }
-                });
-            }
+                dispatch(writeTimeoutAction);
         }
     }
 
@@ -171,6 +157,24 @@ public class TimeoutCoordinator extends StandardCoordinator
     private long now()
     {
         return System.nanoTime();
+    }
+
+    private class ReadTimeoutAction implements Runnable
+    {
+        @Override
+        public void run()
+        {
+            onReadTimeout();
+        }
+    }
+
+    private class WriteTimeoutAction implements Runnable
+    {
+        @Override
+        public void run()
+        {
+            onWriteTimeout();
+        }
     }
 
     private enum State
