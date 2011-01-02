@@ -19,9 +19,12 @@ package org.codehaus.larex.io.connector.ssl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.concurrent.CountDownLatch;
@@ -48,6 +51,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeNoException;
 
 public class SSLClientConnectorTest extends AbstractTestCase
 {
@@ -432,6 +436,22 @@ public class SSLClientConnectorTest extends AbstractTestCase
     @Test
     public void testHandshakeWithExternalSite() throws Exception
     {
+        InetSocketAddress address = new InetSocketAddress("mail.google.com", 443);
+
+        // Test if we can connect to avoid failing the test if we cannot
+        try
+        {
+            new Socket(address.getHostName(), address.getPort());
+        }
+        catch (UnknownHostException x)
+        {
+            assumeNoException(x);
+        }
+        catch (ConnectException x)
+        {
+            assumeNoException(x);
+        }
+
         final CountDownLatch latch = new CountDownLatch(1);
         // Use a SSL connector not configured with the test keystore
         SSLClientConnector connector = new SSLClientConnector(getThreadPool());
@@ -454,7 +474,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
                         }
                     };
                 }
-            }).connect(new InetSocketAddress("mail.google.com", 443));
+            }).connect(address);
 
             assertTrue(connection.awaitReady(1000));
 
