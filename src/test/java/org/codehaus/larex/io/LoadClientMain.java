@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.codehaus.larex.io.connector.ClientConnector;
+import org.codehaus.larex.io.connector.Endpoint;
 
 /**
  * @version $Revision: 13 $ $Date$
@@ -69,16 +70,19 @@ public class LoadClientMain
 
         BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
 
-        System.err.print("server [localhost]: ");
+        String defaultHost = "localhost";
+        int defaultPort = 8850;
+
+        System.err.print("server [" + defaultHost + "]: ");
         String value = console.readLine().trim();
         if (value.length() == 0)
-            value = "localhost";
+            value = defaultHost;
         String host = value;
 
-        System.err.print("port [8850]: ");
+        System.err.print("port [" + defaultPort + "]: ");
         value = console.readLine().trim();
         if (value.length() == 0)
-            value = "8850";
+            value = "" + defaultPort;
         int port = Integer.parseInt(value);
 
         int connections = 100;
@@ -115,7 +119,9 @@ public class LoadClientMain
             int currentConnections = this.connections.size();
             while (currentConnections < connections)
             {
-                LatencyConnection connection = connector.newEndpoint(connectionFactory).connect(address);
+                Endpoint<LatencyConnection> endpoint = connector.newEndpoint(connectionFactory);
+                endpoint.setBindAddress(new InetSocketAddress("192.168.0.3", 0));
+                LatencyConnection connection = endpoint.connect(address);
                 if (connection.awaitReady(1000))
                     this.connections.add(connection);
                 currentConnections = this.connections.size();
@@ -170,9 +176,8 @@ public class LoadClientMain
                     requestBody += "x";
                 byte[] content = requestBody.getBytes("UTF-8");
 
-                reset();
                 LatencyConnection statsConnection = this.connections.get(0);
-                statsConnection.send((byte)0x00, new byte[0]);
+                statsConnection.send((byte)0xFE, new byte[0]);
 
                 reset();
                 long start = System.nanoTime();
@@ -322,9 +327,13 @@ public class LoadClientMain
             }
 
             System.err.println("Messages - Latency Distribution Curve (X axis: Frequency, Y axis: Latency):");
+            float totalPercentile = 0F;
             for (int i = 0; i < latencyBucketFrequencies.length; i++)
             {
                 long latencyBucketFrequency = latencyBucketFrequencies[i];
+                float lastPercentile = totalPercentile;
+                float percentile = 100F * latencyBucketFrequency / responseCount;
+                totalPercentile += percentile;
                 int value = Math.round(latencyBucketFrequency * (float)latencyBucketFrequencies.length / maxLatencyBucketFrequency);
                 if (value == latencyBucketFrequencies.length) value = value - 1;
                 for (int j = 0; j < value; ++j) System.err.print(" ");
@@ -332,7 +341,20 @@ public class LoadClientMain
                 for (int j = value + 1; j < latencyBucketFrequencies.length; ++j) System.err.print(" ");
                 System.err.print("  _  ");
                 System.err.print(TimeUnit.NANOSECONDS.toMillis((latencyRange * (i + 1) / latencyBucketFrequencies.length) + minLatency.get()));
-                System.err.println(" ms (" + latencyBucketFrequency + ")");
+                System.err.printf(" ms (%d, %.2f%%)", latencyBucketFrequency, percentile);
+                if (lastPercentile < 50F && totalPercentile >= 50F)
+                    System.err.print(" ^50%");
+                if (lastPercentile < 75F && totalPercentile >= 75F)
+                    System.err.print(" ^75%");
+                if (lastPercentile < 90F && totalPercentile >= 90F)
+                    System.err.print(" ^90%");
+                if (lastPercentile < 95F && totalPercentile >= 95F)
+                    System.err.print(" ^95%");
+                if (lastPercentile < 99F && totalPercentile >= 99F)
+                    System.err.print(" ^99%");
+                if (lastPercentile < 99.9F && totalPercentile >= 99.9F)
+                    System.err.print(" ^99.9%");
+                System.err.println();
             }
         }
 
@@ -344,18 +366,24 @@ public class LoadClientMain
 
     private class LatencyConnection extends StandardConnection
     {
-        private CountDownLatch latch;
-        private byte type;
-        private int typeBytes;
-        private long time;
-        private int timeBytes;
-        private int length;
-        private int lengthBytes;
-        private int contentLength;
+        private volatile CountDownLatch latch;
+        private volatile byte type;
+        private volatile int typeBytes;
+        private volatile long time;
+        private volatile int timeBytes;
+        private volatile int length;
+        private volatile int lengthBytes;
+        private volatile int contentLength;
 
         private LatencyConnection(Controller controller)
         {
             super(controller);
+        }
+
+        @Override
+        protected void onOpen()
+        {
+            getController().setReadBufferSize(16384);
         }
 
         @Override
@@ -393,7 +421,17 @@ public class LoadClientMain
 
                 if (contentLength == length)
                 {
-                    if ((type & 0xFF) == 0x00 || (type & 0xFF) == 0xFF)
+                    byte type = this.type;
+                    this.type = 0;
+                    this.typeBytes = 0;
+                    long time = this.time;
+                    this.time = 0;
+                    this.timeBytes = 0;
+                    this.length = 0;
+                    this.lengthBytes = 0;
+                    this.contentLength = 0;
+
+                    if (isControlMessage(type))
                     {
                         latch.countDown();
                     }
@@ -406,14 +444,6 @@ public class LoadClientMain
                         updateLatencies(time, System.nanoTime());
                     }
 
-                    latch = null;
-                    type = 0;
-                    typeBytes = 0;
-                    time = 0;
-                    timeBytes = 0;
-                    length = 0;
-                    lengthBytes = 0;
-                    contentLength = 0;
                 }
             }
 
@@ -422,7 +452,7 @@ public class LoadClientMain
 
         public void send(byte type, byte[] content) throws InterruptedException
         {
-            if ((type & 0xFF) == 0x00 || (type & 0xFF) == 0xFF)
+            if (isControlMessage(type))
                 latch = new CountDownLatch(1);
 
             ByteBuffer buffer = ByteBuffer.allocate(1 + 8 + 2 + content.length);
@@ -437,9 +467,13 @@ public class LoadClientMain
 
             flush(buffer);
 
-            final CountDownLatch latch = this.latch;
-            if (latch != null)
+            if (isControlMessage(type))
                 latch.await();
+        }
+
+        private boolean isControlMessage(byte type)
+        {
+            return (type & 0xFF) == 0xFE || (type & 0xFF) == 0xFF;
         }
     }
 }

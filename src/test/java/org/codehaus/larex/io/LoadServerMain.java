@@ -36,6 +36,8 @@ public class LoadServerMain
     private static final AtomicLong selects = new AtomicLong();
     private static final AtomicLong wakeups = new AtomicLong();
     private static final AtomicLong updates = new AtomicLong();
+    private static final AtomicLong reads = new AtomicLong();
+    private static final AtomicLong writes = new AtomicLong();
 
     public static void main(String[] args) throws Exception
     {
@@ -94,6 +96,8 @@ public class LoadServerMain
         selects.set(0);
         wakeups.set(0);
         updates.set(0);
+        reads.set(0);
+        writes.set(0);
     }
 
     private static void stop()
@@ -101,13 +105,14 @@ public class LoadServerMain
         System.err.println("Selects: " + selects.get());
         System.err.println("Wakeups: " + wakeups.get());
         System.err.println("Updates: " + updates.get());
+        System.err.println("Reads: " + reads.get());
+        System.err.println("Writes: " + writes.get());
     }
 
     private static class LoadConnection extends EchoConnection
     {
         private byte type;
         private int typeBytes;
-        private long time;
         private int timeBytes;
         private int length;
         private int lengthBytes;
@@ -116,6 +121,12 @@ public class LoadServerMain
         private LoadConnection(Controller controller)
         {
             super(controller);
+        }
+
+        @Override
+        protected void onOpen()
+        {
+            getController().setReadBufferSize(16384);
         }
 
         @Override
@@ -133,8 +144,6 @@ public class LoadServerMain
                 }
                 else if (timeBytes < 8)
                 {
-                    time <<= 8;
-                    time += currByte & 0xFF;
                     ++timeBytes;
                     continue;
                 }
@@ -153,7 +162,7 @@ public class LoadServerMain
 
                 if (contentLength == length)
                 {
-                    if ((type & 0xFF) == 0x00)
+                    if ((type & 0xFF) == 0xFE)
                         start();
                     else if ((type & 0xFF) == 0xFF)
                         stop();
@@ -170,11 +179,29 @@ public class LoadServerMain
             return super.onRead(buffer);
         }
 
+        private static class StatisticsInterceptor extends Interceptor.Forwarder
+        {
+            @Override
+            public boolean onRead(ByteBuffer buffer)
+            {
+                reads.incrementAndGet();
+                return super.onRead(buffer);
+            }
+
+            @Override
+            public int write(ByteBuffer buffer)
+            {
+                writes.incrementAndGet();
+                return super.write(buffer);
+            }
+        }
+
         private static class Factory implements ConnectionFactory<LoadConnection>
         {
             @Override
             public LoadConnection newConnection(Controller controller)
             {
+                controller.addInterceptor(new StatisticsInterceptor());
                 return new LoadConnection(controller);
             }
         }
