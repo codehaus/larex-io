@@ -60,8 +60,8 @@ public class ServerConnector
     private volatile boolean tcpNoDelay = true;
     private volatile boolean reuseAddress = true;
     private volatile int backlogSize = 128;
-    private volatile long readTimeout = 0;
-    private volatile long writeTimeout = 0;
+    private volatile long readTimeout = 120000;
+    private volatile long writeTimeout = 60000;
     private volatile ServerSocketChannel serverChannel;
 
     public ServerConnector(InetSocketAddress address, ConnectionFactory connectionFactory, Executor threadPool)

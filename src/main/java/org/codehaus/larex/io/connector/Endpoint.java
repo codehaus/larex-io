@@ -28,9 +28,9 @@ public abstract class Endpoint<T extends Connection>
     private InetSocketAddress bindAddress;
     private boolean tcpNoDelay = true;
     private boolean reuseAddress = true;
-    private long connectTimeout;
-    private long readTimeout;
-    private long writeTimeout;
+    private long connectTimeout = 10000;
+    private long readTimeout = 120000;
+    private long writeTimeout = 30000;
 
     public InetSocketAddress getBindAddress()
     {
