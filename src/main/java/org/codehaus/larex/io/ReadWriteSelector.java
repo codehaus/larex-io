@@ -89,19 +89,22 @@ public class ReadWriteSelector implements Selector
 
     public void submit(Runnable task)
     {
+        boolean debug = logger.isDebugEnabled();
         if (Thread.currentThread() != thread)
         {
             tasks.add(task);
+            if (debug)
+                logger.debug("Added task {}", task);
             boolean wakeup = needsWakeup;
             if (wakeup)
                 wakeup();
-            logger.debug("Added task {}, woken up: {}", task, wakeup);
         }
         else
         {
             runTasks();
             runTask(task);
-            logger.debug("Run task {}, woken up: false", task);
+            if (debug)
+                logger.debug("Run task {}", task);
         }
     }
 
@@ -203,8 +206,8 @@ public class ReadWriteSelector implements Selector
     {
         runTasks();
 
-        // If tasks are submitted here, they read will not wakeup the selector
-        // Therefore below we run again the tasks
+        // If tasks are submitted between these 2 statements, they will not
+        // wakeup the selector, therefore below we run again the tasks
 
         needsWakeup = true;
 
