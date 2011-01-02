@@ -154,8 +154,18 @@ public class StandardCoordinator implements Coordinator
 
         readBegin();
 
+        // Reads are performed by the JVM in a temporary direct buffer, then copied
+        // into the buffer passed to SocketChannel.read(Buffer).
+        // In general there is no big savings in having the read buffer to be direct
+        // since a copy of the data is performed anyway (although copying from direct
+        // to direct could be optimized by the JVM).
+        // There is however a big saving in writing using a direct buffer, since the
+        // data does not need to be copied to a temporary direct buffer.
+        // So we use a direct buffer here to read, to exploit the possible JVM
+        // optimization, and to allow the user code to use this buffer as the write
+        // buffer (read from it, clear it, fill it with data, write it).
         int readBufferSize = getReadBufferSize();
-        ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, false);
+        ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, true);
         try
         {
             // The buffer can be smaller than the data available,
@@ -163,7 +173,7 @@ public class StandardCoordinator implements Coordinator
             while (true)
             {
                 int start = buffer.position();
-                closed = doRead(buffer);
+                closed = read(buffer);
                 read = buffer.position() - start;
                 totalRead += read;
 
@@ -191,7 +201,7 @@ public class StandardCoordinator implements Coordinator
         if (closed)
         {
             // If the input is closed by user code, reading returns -1,
-            // but that's different from a remote close
+            // but that's different from a remote close that also returns -1
             if (channel.isClosed(StreamType.INPUT))
             {
                 if (debug)
@@ -215,7 +225,7 @@ public class StandardCoordinator implements Coordinator
     {
     }
 
-    protected boolean doRead(ByteBuffer buffer)
+    protected boolean read(ByteBuffer buffer)
     {
         return getChannel().read(buffer);
     }
@@ -370,13 +380,9 @@ public class StandardCoordinator implements Coordinator
             {
                 processOnRead();
             }
-            catch (RuntimeSocketClosedException x)
+            catch (Exception x)
             {
-                logger.debug("Could not read, channel has been closed", x);
-            }
-            catch (RuntimeIOException x)
-            {
-                logger.debug("Could not read", x);
+                logger.debug("Could not process read", x);
             }
         }
     }
@@ -392,7 +398,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Could not process write", x);
             }
         }
     }
@@ -408,7 +414,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Could not process close", x);
             }
         }
     }
@@ -436,7 +442,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onOpen", x);
             }
         }
 
@@ -449,7 +455,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onReadTimeout", x);
             }
         }
 
@@ -462,7 +468,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onRead", x);
                 return true;
             }
         }
@@ -476,7 +482,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onWrite", x);
             }
         }
 
@@ -489,7 +495,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onWriteTimeout", x);
             }
         }
 
@@ -508,7 +514,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onRemoteClose", x);
             }
         }
 
@@ -521,7 +527,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onClosing", x);
             }
         }
 
@@ -534,7 +540,7 @@ public class StandardCoordinator implements Coordinator
             }
             catch (Exception x)
             {
-                logger.info("Unexpected exception", x);
+                logger.info("Unexpected exception in Interceptor.onClosed", x);
             }
         }
 
