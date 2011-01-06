@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ReadWriteSelector implements Selector
+public class ReadWriteReactor implements Reactor
 {
     private static final AtomicInteger ids = new AtomicInteger();
 
@@ -44,7 +44,7 @@ public class ReadWriteSelector implements Selector
         try
         {
             this.selector = java.nio.channels.Selector.open();
-            this.thread = newSelectorThread(new SelectorLoop());
+            this.thread = newReactorThread(new ReactorLoop());
             this.thread.start();
         }
         catch (IOException x)
@@ -53,9 +53,9 @@ public class ReadWriteSelector implements Selector
         }
     }
 
-    protected Thread newSelectorThread(Runnable selector)
+    protected Thread newReactorThread(Runnable reactor)
     {
-        return new Thread(selector, "Selector-" + ids.incrementAndGet());
+        return new Thread(reactor, "Reactor-" + ids.incrementAndGet());
     }
 
     public void register(Channel channel, Listener listener)
@@ -70,12 +70,12 @@ public class ReadWriteSelector implements Selector
         // the selector wake-ups at minimum.
         // Updating the selection key operations does not by itself
         // automatically wake up the selector.
-        // Removing operations interest is normally done in the selector
+        // Removing operations interest is normally done in the reactor
         // thread and *before* the selector waits again on a select() call.
         // This ensures that the selector has an updated status for the
         // selection key.
         // Adding operations interest, on the other hand, when not done
-        // from the selector thread, needs to wake up the selector so
+        // from the reactor thread, needs to wake up the selector so
         // that it can call select() and notice that the selection key
         // status has changed.
 
@@ -134,10 +134,10 @@ public class ReadWriteSelector implements Selector
                 processTasks();
 
                 if (debug)
-                    logger.debug("Selector loop waiting on select");
+                    logger.debug("Reactor loop waiting on select");
                 int selected = select();
                 if (debug)
-                    logger.debug("Selector loop woken up from select, {}/{} selected", selected, selector.keys().size());
+                    logger.debug("Reactor loop woken up from select, {}/{} selected", selected, selector.keys().size());
 
                 needsWakeup = false;
 
@@ -156,7 +156,7 @@ public class ReadWriteSelector implements Selector
                 {
                     selected = selectNow();
                     if (debug)
-                        logger.debug("Selector loop re-selecting, {}/{} selected", selected, selector.keys().size());
+                        logger.debug("Reactor loop re-selecting, {}/{} selected", selected, selector.keys().size());
                 }
 
                 if (selected > 0)
@@ -166,13 +166,13 @@ public class ReadWriteSelector implements Selector
                     {
                         SelectionKey selectedKey = iterator.next();
                         if (debug)
-                            logger.debug("Selector loop selected key {} with operations {}", selectedKey, selectedKey.interestOps());
+                            logger.debug("Reactor loop selected key {} with operations {}", selectedKey, selectedKey.interestOps());
                         iterator.remove();
 
                         if (!selectedKey.isValid())
                         {
                             if (debug)
-                                logger.debug("Selector loop ignoring invalid key {}", selectedKey);
+                                logger.debug("Reactor loop ignoring invalid key {}", selectedKey);
                             continue;
                         }
 
@@ -274,18 +274,18 @@ public class ReadWriteSelector implements Selector
         }
     }
 
-    private class SelectorLoop implements Runnable
+    private class ReactorLoop implements Runnable
     {
         public void run()
         {
-            logger.debug("Selector loop entered");
+            logger.debug("Reactor loop entered");
             try
             {
                 selectLoop();
             }
             finally
             {
-                logger.debug("Selector loop exited");
+                logger.debug("Reactor loop exited");
             }
         }
     }

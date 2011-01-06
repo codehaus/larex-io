@@ -23,8 +23,8 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.CachedByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
-import org.codehaus.larex.io.Selector;
-import org.codehaus.larex.io.TimeoutReadWriteSelector;
+import org.codehaus.larex.io.Reactor;
+import org.codehaus.larex.io.TimeoutReadWriteReactor;
 
 /**
  * @version $Revision$ $Date$
@@ -32,33 +32,33 @@ import org.codehaus.larex.io.TimeoutReadWriteSelector;
 public class ClientConnector
 {
     private final Executor threadPool;
-    private final AtomicInteger selectorIndex = new AtomicInteger();
+    private final AtomicInteger reactorIndex = new AtomicInteger();
     private volatile ByteBuffers byteBuffers;
-    private volatile int selectorCount = 1;
-    private volatile Selector[] selectors;
+    private volatile int reactorCount = 1;
+    private volatile Reactor[] reactors;
 
     public ClientConnector(Executor threadPool)
     {
         this.threadPool = threadPool;
     }
 
-    public int getSelectorCount()
+    public int getReactorCount()
     {
-        return selectorCount;
+        return reactorCount;
     }
 
-    public void setSelectorCount(int selectorCount)
+    public void setReactorCount(int reactorCount)
     {
-        this.selectorCount = selectorCount;
+        this.reactorCount = reactorCount;
     }
 
     public void open()
     {
         this.byteBuffers = newByteBuffers();
 
-        this.selectors = new Selector[getSelectorCount()];
-        for (int i = 0; i < selectors.length; ++i)
-            this.selectors[i] = newSelector();
+        this.reactors = new Reactor[getReactorCount()];
+        for (int i = 0; i < reactors.length; ++i)
+            this.reactors[i] = newReactor();
     }
 
     protected ByteBuffers newByteBuffers()
@@ -66,11 +66,11 @@ public class ClientConnector
         return new CachedByteBuffers();
     }
 
-    protected Selector newSelector()
+    protected Reactor newReactor()
     {
-        TimeoutReadWriteSelector selector = new TimeoutReadWriteSelector();
-        selector.open();
-        return selector;
+        TimeoutReadWriteReactor reactor = new TimeoutReadWriteReactor();
+        reactor.open();
+        return reactor;
     }
 
     protected Executor getThreadPool()
@@ -83,36 +83,36 @@ public class ClientConnector
         return byteBuffers;
     }
 
-    protected Selector[] getSelectors()
+    protected Reactor[] getReactors()
     {
-        return selectors;
+        return reactors;
     }
 
     public <C extends Connection> Endpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
     {
-        return new StandardEndpoint<C>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool());
+        return new StandardEndpoint<C>(connectionFactory, chooseReactor(), getByteBuffers(), getThreadPool());
     }
 
-    protected Selector chooseSelector()
+    protected Reactor chooseReactor()
     {
-        int index = selectorIndex.incrementAndGet();
-        Selector[] selectors = getSelectors();
-        index = Math.abs(index % selectors.length);
-        return selectors[index];
+        int index = reactorIndex.incrementAndGet();
+        Reactor[] reactors = getReactors();
+        index = Math.abs(index % reactors.length);
+        return reactors[index];
     }
 
     public void close()
     {
-        for (Selector selector : selectors)
-            selector.close();
+        for (Reactor reactor : reactors)
+            reactor.close();
     }
 
     public boolean join(long timeout) throws InterruptedException
     {
         boolean result = true;
 
-        for (Selector selector : selectors)
-            result &= selector.join(timeout);
+        for (Reactor reactor : reactors)
+            result &= reactor.join(timeout);
 
         return result;
     }

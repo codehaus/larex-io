@@ -78,7 +78,7 @@ public class SSLClientConnector extends ClientConnector
 
     public <C extends Connection> SSLEndpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
     {
-        return new SSLEndpoint<C>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool(), getSSLContext(), getSSLByteBuffers());
+        return new SSLEndpoint<C>(connectionFactory, chooseReactor(), getByteBuffers(), getThreadPool(), getSSLContext(), getSSLByteBuffers());
     }
 
     public String getProtocolAlgorithm()

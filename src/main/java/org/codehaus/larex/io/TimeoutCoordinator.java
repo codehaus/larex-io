@@ -31,9 +31,9 @@ public class TimeoutCoordinator extends StandardCoordinator
     private volatile long readTime;
     private volatile long writeTime;
 
-    public TimeoutCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool, long readTimeout, long writeTimeout)
+    public TimeoutCoordinator(Reactor reactor, ByteBuffers byteBuffers, Executor threadPool, long readTimeout, long writeTimeout)
     {
-        super(selector, byteBuffers, threadPool);
+        super(reactor, byteBuffers, threadPool);
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;
     }

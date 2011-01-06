@@ -65,10 +65,10 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                 @Override
                 public <T extends Connection> Endpoint<T> newEndpoint(ConnectionFactory<T> connectionFactory)
                 {
-                    return new StandardEndpoint<T>(connectionFactory, chooseSelector(), getByteBuffers(), getThreadPool())
+                    return new StandardEndpoint<T>(connectionFactory, chooseReactor(), getByteBuffers(), getThreadPool())
                     {
                         @Override
-                        protected void register(Channel channel, Selector.Listener listener)
+                        protected void register(Channel channel, Reactor.Listener listener)
                         {
                             try
                             {

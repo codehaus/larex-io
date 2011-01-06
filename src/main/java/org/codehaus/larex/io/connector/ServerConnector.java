@@ -32,11 +32,11 @@ import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Reactor;
 import org.codehaus.larex.io.RuntimeIOException;
-import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.StandardChannel;
 import org.codehaus.larex.io.TimeoutCoordinator;
-import org.codehaus.larex.io.TimeoutReadWriteSelector;
+import org.codehaus.larex.io.TimeoutReadWriteReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,10 +51,10 @@ public class ServerConnector
     private final InetSocketAddress address;
     private final ConnectionFactory connectionFactory;
     private final Executor threadPool;
-    private final AtomicInteger selectorIndex = new AtomicInteger();
+    private final AtomicInteger reactorIndex = new AtomicInteger();
     private volatile ByteBuffers byteBuffers;
-    private volatile int selectorCount = 1;
-    private volatile Selector[] selectors;
+    private volatile int reactorCount = 1;
+    private volatile Reactor[] reactors;
     private volatile int acceptorCount = 1;
     private volatile Thread[] acceptors;
     private volatile boolean tcpNoDelay = true;
@@ -86,19 +86,19 @@ public class ServerConnector
         return byteBuffers;
     }
 
-    protected Selector[] getSelectors()
+    protected Reactor[] getReactors()
     {
-        return selectors;
+        return reactors;
     }
 
-    public int getSelectorCount()
+    public int getReactorCount()
     {
-        return selectorCount;
+        return reactorCount;
     }
 
-    public void setSelectorCount(int selectorCount)
+    public void setReactorCount(int reactorCount)
     {
-        this.selectorCount = selectorCount;
+        this.reactorCount = reactorCount;
     }
 
     public int getAcceptorCount()
@@ -177,9 +177,9 @@ public class ServerConnector
 
         this.byteBuffers = newByteBuffers();
 
-        this.selectors = new Selector[getSelectorCount()];
-        for (int i = 0; i < selectors.length; ++i)
-            this.selectors[i] = newSelector();
+        this.reactors = new Reactor[getReactorCount()];
+        for (int i = 0; i < reactors.length; ++i)
+            this.reactors[i] = newReactor();
 
         this.acceptors = new Thread[getAcceptorCount()];
         for (int i = 0; i < acceptors.length; ++i)
@@ -193,11 +193,11 @@ public class ServerConnector
         return serverChannel.socket().getLocalPort();
     }
 
-    protected Selector newSelector()
+    protected Reactor newReactor()
     {
-        TimeoutReadWriteSelector selector = new TimeoutReadWriteSelector();
-        selector.open();
-        return selector;
+        TimeoutReadWriteReactor reactor = new TimeoutReadWriteReactor();
+        reactor.open();
+        return reactor;
     }
 
     protected Thread newAcceptorThread(Runnable acceptor)
@@ -213,8 +213,8 @@ public class ServerConnector
             for (Thread acceptor : acceptors)
                 acceptor.interrupt();
 
-            for (Selector selector : selectors)
-                selector.close();
+            for (Reactor reactor : reactors)
+                reactor.close();
 
             serverChannel.close();
             logger.debug("ServerConnector {} closed", this);
@@ -235,8 +235,8 @@ public class ServerConnector
             result &= acceptor.isAlive();
         }
 
-        for (Selector selector : selectors)
-            result &= selector.join(timeout);
+        for (Reactor reactor : reactors)
+            result &= reactor.join(timeout);
 
         return result;
     }
@@ -282,34 +282,34 @@ public class ServerConnector
 
         socketChannel.configureBlocking(false);
 
-        Selector selector = chooseSelector();
-        Coordinator coordinator = newCoordinator(selector);
+        Reactor reactor = chooseReactor();
+        Coordinator coordinator = newCoordinator(reactor);
 
-        Channel channel = newChannel(selector, socketChannel, coordinator);
+        Channel channel = newChannel(reactor, socketChannel, coordinator);
         coordinator.setChannel(channel);
 
         Connection connection = newConnection(socketChannel, coordinator);
         coordinator.setConnection(connection);
 
-        register(selector, channel, coordinator);
+        register(reactor, channel, coordinator);
     }
 
-    protected Selector chooseSelector()
+    protected Reactor chooseReactor()
     {
-        int index = selectorIndex.incrementAndGet();
-        Selector[] selectors = getSelectors();
-        index = Math.abs(index % selectors.length);
-        return selectors[index];
+        int index = reactorIndex.incrementAndGet();
+        Reactor[] reactors = getReactors();
+        index = Math.abs(index % reactors.length);
+        return reactors[index];
     }
 
-    protected Coordinator newCoordinator(Selector selector)
+    protected Coordinator newCoordinator(Reactor reactor)
     {
-        return new TimeoutCoordinator(selector, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
     }
 
-    protected Channel newChannel(Selector selector, SocketChannel channel, Controller controller)
+    protected Channel newChannel(Reactor reactor, SocketChannel channel, Controller controller)
     {
-        return new StandardChannel(selector, channel, controller);
+        return new StandardChannel(reactor, channel, controller);
     }
 
     protected Connection newConnection(SocketChannel socketChannel, Controller controller)
@@ -317,9 +317,9 @@ public class ServerConnector
         return connectionFactory.newConnection(controller);
     }
 
-    protected void register(Selector selector, Channel channel, Selector.Listener listener)
+    protected void register(Reactor reactor, Channel channel, Reactor.Listener listener)
     {
-        selector.register(channel, listener);
+        reactor.register(channel, listener);
     }
 
     protected class Acceptor implements Runnable

@@ -31,7 +31,7 @@ public class StandardChannel implements Channel, Runnable
 {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final boolean debug = logger.isDebugEnabled();
-    private final Selector selector;
+    private final Reactor reactor;
     private final SocketChannel channel;
     private final Controller controller;
     private volatile int readAggressiveness = 2;
@@ -39,9 +39,9 @@ public class StandardChannel implements Channel, Runnable
     private volatile SelectionKey selectionKey;
     private volatile int interestOps;
 
-    public StandardChannel(Selector selector, SocketChannel channel, Controller controller)
+    public StandardChannel(Reactor reactor, SocketChannel channel, Controller controller)
     {
-        this.selector = selector;
+        this.reactor = reactor;
         this.channel = channel;
         this.controller = controller;
     }
@@ -67,10 +67,10 @@ public class StandardChannel implements Channel, Runnable
     }
 
     @Override
-    public boolean register(final java.nio.channels.Selector nioSelector, final Selector.Listener listener) throws RuntimeSocketClosedException
+    public boolean register(final java.nio.channels.Selector selector, final Reactor.Listener listener) throws RuntimeSocketClosedException
     {
-        Register task = new Register(nioSelector, listener);
-        selector.submit(task);
+        Register task = new Register(selector, listener);
+        reactor.submit(task);
         return task.result();
     }
 
@@ -86,7 +86,7 @@ public class StandardChannel implements Channel, Runnable
         if (newOperations != oldOperations)
         {
             interestOps = newOperations;
-            selector.submit(this);
+            reactor.submit(this);
         }
     }
 
@@ -116,10 +116,10 @@ public class StandardChannel implements Channel, Runnable
     }
 
     @Override
-    public boolean unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener)
+    public boolean unregister(java.nio.channels.Selector selector, Reactor.Listener listener)
     {
         Unregister task = new Unregister();
-        selector.submit(task);
+        reactor.submit(task);
         return task.result();
     }
 
@@ -258,7 +258,7 @@ public class StandardChannel implements Channel, Runnable
     protected void close() throws IOException
     {
         Close task = new Close();
-        selector.submit(task);
+        reactor.submit(task);
         task.await();
     }
 
@@ -272,9 +272,9 @@ public class StandardChannel implements Channel, Runnable
     {
         private final CountDownLatch latch = new CountDownLatch(1);
         private final java.nio.channels.Selector selector;
-        private final Selector.Listener listener;
+        private final Reactor.Listener listener;
 
-        private Register(java.nio.channels.Selector selector, Selector.Listener listener)
+        private Register(java.nio.channels.Selector selector, Reactor.Listener listener)
         {
             this.selector = selector;
             this.listener = listener;
@@ -368,7 +368,7 @@ public class StandardChannel implements Channel, Runnable
                 final SelectionKey selectionKey = StandardChannel.this.selectionKey;
                 if (selectionKey != null)
                 {
-                    selector.unregister(StandardChannel.this, (Selector.Listener)selectionKey.attachment());
+                    reactor.unregister(StandardChannel.this, (Reactor.Listener)selectionKey.attachment());
                     StandardChannel.this.selectionKey = null;
                 }
                 channel.close();

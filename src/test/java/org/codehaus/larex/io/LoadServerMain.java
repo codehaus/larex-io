@@ -50,9 +50,9 @@ public class LoadServerMain
         ServerConnector connector = new ServerConnector(address, new LoadConnection.Factory(), threadPool)
         {
             @Override
-            protected Selector newSelector()
+            protected Reactor newReactor()
             {
-                TimeoutReadWriteSelector selector = new TimeoutReadWriteSelector()
+                TimeoutReadWriteReactor reactor = new TimeoutReadWriteReactor()
                 {
                     @Override
                     protected int select() throws IOException
@@ -68,14 +68,14 @@ public class LoadServerMain
                         super.wakeup();
                     }
                 };
-                selector.open();
-                return selector;
+                reactor.open();
+                return reactor;
             }
 
             @Override
-            protected Channel newChannel(Selector selector, SocketChannel channel, Controller controller)
+            protected Channel newChannel(Reactor reactor, SocketChannel channel, Controller controller)
             {
-                return new StandardChannel(selector, channel, controller)
+                return new StandardChannel(reactor, channel, controller)
                 {
                     @Override
                     public void run()
@@ -87,7 +87,7 @@ public class LoadServerMain
             }
         };
         connector.setAcceptorCount(1);
-        connector.setSelectorCount(1);
+        connector.setReactorCount(1);
         connector.listen();
     }
 

@@ -18,13 +18,13 @@ package org.codehaus.larex.io;
 
 /**
  * <p>{@link Coordinator} coordinates the activity between the {@link Channel},
- * the {@link Connection} and the {@link Selector}.</p>
- * <p>{@link Coordinator} receives I/O events from the {@link Selector}, and
+ * the {@link Connection} and the {@link Reactor}.</p>
+ * <p>{@link Coordinator} receives I/O events from the {@link Reactor}, and
  * dispatches them appropriately to either the {@link Channel} or the {@link Connection}.</p>
  *
  * @version $Revision: 903 $ $Date$
  */
-public interface Coordinator extends Selector.Listener, Controller
+public interface Coordinator extends Reactor.Listener, Controller
 {
     /**
      * @param channel the channel associated with this coordinator

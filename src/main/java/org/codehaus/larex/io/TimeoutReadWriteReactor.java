@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * @version $Revision$ $Date$
  */
-public class TimeoutReadWriteSelector extends ReadWriteSelector implements Runnable
+public class TimeoutReadWriteReactor extends ReadWriteReactor implements Runnable
 {
     private static final AtomicInteger ids = new AtomicInteger();
 

@@ -45,12 +45,12 @@ public class ClientReadTimeoutTest extends AbstractTestCase
             ClientConnector connector = new ClientConnector(getThreadPool())
             {
                 @Override
-                protected Selector newSelector()
+                protected Reactor newReactor()
                 {
-                    TimeoutReadWriteSelector selector = new TimeoutReadWriteSelector();
-                    selector.setTimerPeriod(timerPeriod);
-                    selector.open();
-                    return selector;
+                    TimeoutReadWriteReactor reactor = new TimeoutReadWriteReactor();
+                    reactor.setTimerPeriod(timerPeriod);
+                    reactor.open();
+                    return reactor;
                 }
             };
             connector.open();
@@ -75,7 +75,7 @@ public class ClientReadTimeoutTest extends AbstractTestCase
                 int readTimeout = 1000;
                 endpoint.setReadTimeout(readTimeout);
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                
+
                 try
                 {
                     assertTrue(timeoutLatch.await(readTimeout * 2 + timerPeriod, TimeUnit.MILLISECONDS));

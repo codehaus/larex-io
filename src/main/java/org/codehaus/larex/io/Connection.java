@@ -29,7 +29,7 @@ import java.nio.ByteBuffer;
  * <br />
  * <p><b>IMPLEMENTATION NOTES</b></p>
  * <p>Implementing directly a {@link Connection} requires controlling carefully threading to avoid
- * to block {@link Selector} threads or timer threads, and must be done in concert with the
+ * to block {@link Reactor} threads or timer threads, and must be done in concert with the
  * {@link Coordinator} implementation.</p>
  */
 public interface Connection

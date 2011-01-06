@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 public class StandardCoordinator implements Coordinator
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
-    private final Selector selector;
+    private final Reactor reactor;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
     private final Runnable onOpenAction = new OnOpenAction();
@@ -40,17 +40,17 @@ public class StandardCoordinator implements Coordinator
     private volatile Connection connection;
     private volatile int readBufferSize = 1024;
 
-    public StandardCoordinator(Selector selector, ByteBuffers byteBuffers, Executor threadPool)
+    public StandardCoordinator(Reactor reactor, ByteBuffers byteBuffers, Executor threadPool)
     {
-        this.selector = selector;
+        this.reactor = reactor;
         this.byteBuffers = byteBuffers;
         this.threadPool = threadPool;
         headInterceptor.setNext(tailInterceptor);
     }
 
-    protected Selector getSelector()
+    protected Reactor getReactor()
     {
-        return selector;
+        return reactor;
     }
 
     protected ByteBuffers getByteBuffers()
@@ -273,13 +273,13 @@ public class StandardCoordinator implements Coordinator
     @Override
     public void needsRead(boolean needsRead)
     {
-        getSelector().update(getChannel(), SelectionKey.OP_READ, needsRead);
+        getReactor().update(getChannel(), SelectionKey.OP_READ, needsRead);
     }
 
     @Override
     public void needsWrite(boolean needsWrite)
     {
-        getSelector().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
+        getReactor().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
     }
 
     @Override

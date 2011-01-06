@@ -24,7 +24,7 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
-import org.codehaus.larex.io.Selector;
+import org.codehaus.larex.io.Reactor;
 import org.codehaus.larex.io.connector.StandardEndpoint;
 import org.codehaus.larex.io.ssl.SSLInterceptor;
 
@@ -38,9 +38,9 @@ public class SSLEndpoint<C extends Connection> extends StandardEndpoint<C>
     private final ByteBuffers sslByteBuffers;
     private volatile SSLEngine sslEngine;
 
-    public SSLEndpoint(ConnectionFactory<C> connectionFactory, Selector selector, ByteBuffers byteBuffers, Executor threadPool, SSLContext sslContext, ByteBuffers sslByteBuffers)
+    public SSLEndpoint(ConnectionFactory<C> connectionFactory, Reactor reactor, ByteBuffers byteBuffers, Executor threadPool, SSLContext sslContext, ByteBuffers sslByteBuffers)
     {
-        super(connectionFactory, selector, byteBuffers, threadPool);
+        super(connectionFactory, reactor, byteBuffers, threadPool);
         this.sslContext = sslContext;
         this.sslByteBuffers = sslByteBuffers;
     }

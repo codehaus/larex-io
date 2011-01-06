@@ -25,17 +25,17 @@ import java.nio.channels.SelectableChannel;
 public interface Channel
 {
     /**
-     * <p>Registers this channel with the given {@code nioSelector}
+     * <p>Registers this channel with the given {@code selector}
      * and with the given {@code listener} as attachment.</p>
      *
-     * @param nioSelector the selector this channel must register with
+     * @param selector the selector this channel must register with
      * @param listener the attachment of the registration
      * @return whether the registration has been successful
      * @throws RuntimeSocketClosedException if this channel has been closed
      * @see java.nio.channels.SelectableChannel#register(java.nio.channels.Selector , int, Object)
-     * @see #unregister(java.nio.channels.Selector, Selector.Listener)
+     * @see #unregister(java.nio.channels.Selector, Reactor.Listener)
      */
-    public boolean register(java.nio.channels.Selector nioSelector, Selector.Listener listener) throws RuntimeSocketClosedException;
+    public boolean register(java.nio.channels.Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException;
 
     /**
      * <p>Updates this channel's interests, adding (or removing) the given {@code operations}.</p>
@@ -47,13 +47,13 @@ public interface Channel
     public void update(int operations, boolean add) throws RuntimeSocketClosedException;
 
     /**
-     * <p>Unregisters this channel from the given {@code nioSelector}.</p>
-     * @param nioSelector the selector this channel was registered with
+     * <p>Unregisters this channel from the given {@code selector}.</p>
+     * @param selector the selector this channel was registered with
      * @param listener the attachment of the registration
      * @return whether the unregistration has been successful
-     * @see #register(java.nio.channels.Selector, Selector.Listener)
+     * @see #register(java.nio.channels.Selector, Reactor.Listener)
      */
-    public boolean unregister(java.nio.channels.Selector nioSelector, Selector.Listener listener);
+    public boolean unregister(java.nio.channels.Selector selector, Reactor.Listener listener);
 
     /**
      * <p>Reads bytes from this channel into the given buffer.</p>

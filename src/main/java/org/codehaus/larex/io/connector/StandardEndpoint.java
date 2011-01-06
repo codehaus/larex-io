@@ -31,10 +31,10 @@ import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.Reactor;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketConnectException;
 import org.codehaus.larex.io.RuntimeSocketTimeoutException;
-import org.codehaus.larex.io.Selector;
 import org.codehaus.larex.io.StandardChannel;
 import org.codehaus.larex.io.TimeoutCoordinator;
 import org.slf4j.Logger;
@@ -48,17 +48,17 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final SocketChannel channel;
     private final ConnectionFactory<C> connectionFactory;
-    private final Selector selector;
+    private final Reactor reactor;
     private final ByteBuffers byteBuffers;
     private final Executor threadPool;
 
-    public StandardEndpoint(ConnectionFactory<C> connectionFactory, Selector selector, ByteBuffers byteBuffers, Executor threadPool)
+    public StandardEndpoint(ConnectionFactory<C> connectionFactory, Reactor reactor, ByteBuffers byteBuffers, Executor threadPool)
     {
         try
         {
             this.channel = SocketChannel.open();
             this.connectionFactory = connectionFactory;
-            this.selector = selector;
+            this.reactor = reactor;
             this.byteBuffers = byteBuffers;
             this.threadPool = threadPool;
         }
@@ -73,9 +73,9 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
         return channel;
     }
 
-    protected Selector getSelector()
+    protected Reactor getReactor()
     {
-        return selector;
+        return reactor;
     }
 
     protected ByteBuffers getByteBuffers()
@@ -159,17 +159,17 @@ public class StandardEndpoint<C extends Connection> extends Endpoint<C>
 
     protected Coordinator newCoordinator()
     {
-        return new TimeoutCoordinator(getSelector(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
+        return new TimeoutCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
     }
 
     protected Channel newChannel(Controller controller)
     {
-        return new StandardChannel(getSelector(), getSocketChannel(), controller);
+        return new StandardChannel(getReactor(), getSocketChannel(), controller);
     }
 
-    protected void register(Channel channel, Selector.Listener listener)
+    protected void register(Channel channel, Reactor.Listener listener)
     {
-        getSelector().register(channel, listener);
+        getReactor().register(channel, listener);
     }
 
     private void close()

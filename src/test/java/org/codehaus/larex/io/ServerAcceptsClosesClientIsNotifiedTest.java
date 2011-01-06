@@ -42,16 +42,16 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
         ServerConnector serverConnector = new ServerConnector(address, new EchoConnection.Factory(), getThreadPool())
         {
             @Override
-            protected Channel newChannel(Selector selector, SocketChannel channel, Controller controller)
+            protected Channel newChannel(Reactor reactor, SocketChannel channel, Controller controller)
             {
-                return new StandardChannel(selector, channel, controller)
+                return new StandardChannel(reactor, channel, controller)
                 {
                     @Override
-                    public boolean register(java.nio.channels.Selector nioSelector, Selector.Listener listener) throws RuntimeSocketClosedException
+                    public boolean register(java.nio.channels.Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException
                     {
                         try
                         {
-                            return super.register(nioSelector, listener);
+                            return super.register(selector, listener);
                         }
                         finally
                         {
@@ -62,10 +62,10 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
             }
 
             @Override
-            protected void register(Selector selector, Channel channel, Selector.Listener listener)
+            protected void register(Reactor reactor, Channel channel, Reactor.Listener listener)
             {
                 channel.close(StreamType.INPUT_OUTPUT);
-                super.register(selector, channel, listener);
+                super.register(reactor, channel, listener);
             }
         };
         int port = serverConnector.listen();
@@ -93,7 +93,7 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
                 });
                 endpoint.connect(new InetSocketAddress("localhost", port));
 
-                // Wait for the Selector to register the channel
+                // Wait for the Reactor to register the channel
                 assertTrue(registerLatch.await(1000, TimeUnit.MILLISECONDS));
 
                 // When the server side of a socket is closed, the client is not notified (although a TCP FIN packet arrives).

@@ -17,14 +17,14 @@
 package org.codehaus.larex.io;
 
 /**
- * <p>{@link Selector} hides the complexity of working with {@link java.nio.channels.Selector}.</p>
- * <p>A {@link Selector} associates an {@link Channel} to a {@link Listener} so that
+ * <p>{@link Reactor} hides the complexity of working with {@link java.nio.channels.Selector}.</p>
+ * <p>A {@link Reactor} associates an {@link Channel} to a {@link Listener} so that
  * when the I/O system associated to the channel signals readiness for I/O events, the listener is
  * notified.</p>
- * <p>It is possible to interact with a {@link Selector} only by {@link #submit(Runnable) submitting}
- * tasks that will be executed by the {@link Selector} on a dedicated thread.
+ * <p>It is possible to interact with a {@link Reactor} only by {@link #submit(Runnable) submitting}
+ * tasks that will be executed by the {@link Reactor} on a dedicated thread.
  */
-public interface Selector
+public interface Reactor
 {
     /**
      * <p>Associates the given {@code channel} to the given {@code listener}, so that when the
@@ -56,53 +56,53 @@ public interface Selector
     public void unregister(Channel channel, Listener listener);
 
     /**
-     * Submits the given {@code task} for execution by this {@link Selector}.
+     * Submits the given {@code task} for execution by this {@link Reactor}.
      * @param task the task to execute.
      */
     public void submit(Runnable task);
 
     /**
-     * <p>Closes this selector.</p>
-     * <p>Closing a selector causes all channels registered with it to be closed.</p>
+     * <p>Closes this reactor.</p>
+     * <p>Closing a reactor causes all channels registered with it to be closed.</p>
      */
     public void close();
 
     /**
-     * <p>Blocks after a close request until this selector terminates, the given {@code timeout}
+     * <p>Blocks after a close request until this reactor terminates, the given {@code timeout}
      * elapses or the current thread is interrupted.</p>
      *
      * @param timeout the maximum time to wait, in milliseconds
-     * @return true if this selector terminated, false if the timeout elapsed
+     * @return true if this reactor terminated, false if the timeout elapsed
      * @throws InterruptedException if interrupted while waiting
      */
     public boolean join(long timeout) throws InterruptedException;
 
     /**
-     * <p>The interface for receiving events from a {@link Selector}.</p>
+     * <p>The interface for receiving events from a {@link Reactor}.</p>
      */
     public interface Listener
     {
         /**
-         * <p>Invoked when the {@link Selector} first registers with the I/O system.</p>
+         * <p>Invoked when the {@link Reactor} first registers with the I/O system.</p>
          */
         void onOpen();
 
         /**
-         * <p>Invoked when the {@link Selector} detects that the I/O system is ready to read.</p>
+         * <p>Invoked when the {@link Reactor} detects that the I/O system is ready to read.</p>
          *
          * @see #onWriteReady()
          */
         public void onReadReady();
 
         /**
-         * <p>Invoked when the {@link Selector} detects that the I/O system is ready to write.</p>
+         * <p>Invoked when the {@link Reactor} detects that the I/O system is ready to write.</p>
          *
          * @see #onReadReady()
          */
         public void onWriteReady();
 
         /**
-         * <p>Invoked when the {@link Selector} detects that the I/O system is closed.</p>
+         * <p>Invoked when the {@link Reactor} detects that the I/O system is closed.</p>
          */
         void onClose();
     }
