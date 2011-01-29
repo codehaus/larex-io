@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 
@@ -67,7 +68,7 @@ public class StandardChannel implements Channel, Runnable
     }
 
     @Override
-    public boolean register(final java.nio.channels.Selector selector, final Reactor.Listener listener) throws RuntimeSocketClosedException
+    public boolean register(Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException
     {
         Register task = new Register(selector, listener);
         reactor.submit(task);
@@ -116,7 +117,7 @@ public class StandardChannel implements Channel, Runnable
     }
 
     @Override
-    public boolean unregister(java.nio.channels.Selector selector, Reactor.Listener listener)
+    public boolean unregister(Selector selector, Reactor.Listener listener)
     {
         Unregister task = new Unregister();
         reactor.submit(task);
@@ -271,10 +272,10 @@ public class StandardChannel implements Channel, Runnable
     private class Register implements Runnable
     {
         private final CountDownLatch latch = new CountDownLatch(1);
-        private final java.nio.channels.Selector selector;
+        private final Selector selector;
         private final Reactor.Listener listener;
 
-        private Register(java.nio.channels.Selector selector, Reactor.Listener listener)
+        private Register(Selector selector, Reactor.Listener listener)
         {
             this.selector = selector;
             this.listener = listener;

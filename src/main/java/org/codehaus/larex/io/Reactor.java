@@ -16,8 +16,10 @@
 
 package org.codehaus.larex.io;
 
+import java.nio.channels.Selector;
+
 /**
- * <p>{@link Reactor} hides the complexity of working with {@link java.nio.channels.Selector}.</p>
+ * <p>{@link Reactor} hides the complexity of working with {@link Selector}.</p>
  * <p>A {@link Reactor} associates an {@link Channel} to a {@link Listener} so that
  * when the I/O system associated to the channel signals readiness for I/O events, the listener is
  * notified.</p>

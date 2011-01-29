@@ -17,6 +17,7 @@
 package org.codehaus.larex.io;
 
 import java.net.InetSocketAddress;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +48,7 @@ public class ServerAcceptsClosesClientIsNotifiedTest extends AbstractTestCase
                 return new StandardChannel(reactor, channel, controller)
                 {
                     @Override
-                    public boolean register(java.nio.channels.Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException
+                    public boolean register(Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException
                     {
                         try
                         {

@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
@@ -35,7 +36,7 @@ public class ReadWriteReactor implements Reactor
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private final Queue<Runnable> tasks = new ConcurrentLinkedQueue<Runnable>();
-    private volatile java.nio.channels.Selector selector;
+    private volatile Selector selector;
     private volatile Thread thread;
     private volatile boolean needsWakeup = true;
 
@@ -43,7 +44,7 @@ public class ReadWriteReactor implements Reactor
     {
         try
         {
-            this.selector = java.nio.channels.Selector.open();
+            this.selector = Selector.open();
             this.thread = newReactorThread(new ReactorLoop());
             this.thread.start();
         }

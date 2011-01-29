@@ -18,6 +18,7 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.Selector;
 
 /**
  * <p>{@link Channel} hides the complexity of working with {@link SelectableChannel}s.</p>
@@ -32,10 +33,10 @@ public interface Channel
      * @param listener the attachment of the registration
      * @return whether the registration has been successful
      * @throws RuntimeSocketClosedException if this channel has been closed
-     * @see java.nio.channels.SelectableChannel#register(java.nio.channels.Selector , int, Object)
-     * @see #unregister(java.nio.channels.Selector, Reactor.Listener)
+     * @see java.nio.channels.SelectableChannel#register(Selector , int, Object)
+     * @see #unregister(Selector, Reactor.Listener)
      */
-    public boolean register(java.nio.channels.Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException;
+    public boolean register(Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException;
 
     /**
      * <p>Updates this channel's interests, adding (or removing) the given {@code operations}.</p>
@@ -51,9 +52,9 @@ public interface Channel
      * @param selector the selector this channel was registered with
      * @param listener the attachment of the registration
      * @return whether the unregistration has been successful
-     * @see #register(java.nio.channels.Selector, Reactor.Listener)
+     * @see #register(Selector, Reactor.Listener)
      */
-    public boolean unregister(java.nio.channels.Selector selector, Reactor.Listener listener);
+    public boolean unregister(Selector selector, Reactor.Listener listener);
 
     /**
      * <p>Reads bytes from this channel into the given buffer.</p>
