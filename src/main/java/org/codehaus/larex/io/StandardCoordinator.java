@@ -18,33 +18,25 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
-import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class StandardCoordinator implements Coordinator
 {
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
+    protected static final Logger logger = LoggerFactory.getLogger(Coordinator.class);
     private final Reactor reactor;
     private final ByteBuffers byteBuffers;
-    private final Executor threadPool;
-    private final Runnable onOpenAction = new OnOpenAction();
-    private final Runnable onReadAction = new OnReadAction();
-    private final Runnable onWriteAction = new OnWriteAction();
-    private final Runnable onCloseAction = new OnCloseAction();
     private final Interceptor headInterceptor = new Interceptor.Forwarder();
-    private final Interceptor tailInterceptor = new StandardInterceptor();
+    private final Interceptor tailInterceptor = new TailInterceptor();
     private volatile Channel channel;
     private volatile Connection connection;
     private volatile int readBufferSize = 1024;
 
-    public StandardCoordinator(Reactor reactor, ByteBuffers byteBuffers, Executor threadPool)
+    public StandardCoordinator(Reactor reactor, ByteBuffers byteBuffers)
     {
         this.reactor = reactor;
         this.byteBuffers = byteBuffers;
-        this.threadPool = threadPool;
         headInterceptor.setNext(tailInterceptor);
     }
 
@@ -56,11 +48,6 @@ public class StandardCoordinator implements Coordinator
     protected ByteBuffers getByteBuffers()
     {
         return byteBuffers;
-    }
-
-    protected Executor getThreadPool()
-    {
-        return threadPool;
     }
 
     protected Channel getChannel()
@@ -85,15 +72,46 @@ public class StandardCoordinator implements Coordinator
         this.connection = connection;
     }
 
-    protected int getReadBufferSize()
+    @Override
+    public void timeoutRead()
     {
-        return readBufferSize;
     }
 
     @Override
-    public void setReadBufferSize(int size)
+    public void timeoutWrite()
     {
-        this.readBufferSize = size;
+    }
+
+    @Override
+    public void onOpen()
+    {
+        processOnOpen();
+    }
+
+    @Override
+    public void onReadReady()
+    {
+        // Remove interest in further reads, otherwise the select loop will
+        // continue to notify us that it is ready to read
+        needsRead(false);
+        // Perform the read
+        processOnRead();
+    }
+
+    @Override
+    public void onWriteReady()
+    {
+        // Remove interest in further writes, otherwise the select loop will
+        // continue to notify us that it is ready to write
+        needsWrite(false);
+        // Notify the suspended thread that it can write some more
+        processOnWrite();
+    }
+
+    @Override
+    public void onClose()
+    {
+        processOnClose();
     }
 
     @Override
@@ -121,26 +139,38 @@ public class StandardCoordinator implements Coordinator
         return false;
     }
 
-    @Override
-    public void onOpen()
+    protected Interceptor getInterceptor()
     {
-        dispatch(onOpenAction);
+        return headInterceptor;
+    }
+
+    @Override
+    public void needsRead(boolean needsRead)
+    {
+        getReactor().update(getChannel(), SelectionKey.OP_READ, needsRead);
+    }
+
+    @Override
+    public void needsWrite(boolean needsWrite)
+    {
+        getReactor().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
+    }
+
+    protected int getReadBufferSize()
+    {
+        return readBufferSize;
+    }
+
+    @Override
+    public void setReadBufferSize(int size)
+    {
+        this.readBufferSize = size;
     }
 
     protected void processOnOpen()
     {
         getInterceptor().onOpen();
         needsRead(true);
-    }
-
-    @Override
-    public void onReadReady()
-    {
-        // Remove interest in further reads, otherwise the select loop will
-        // continue to notify us that it is ready to read
-        needsRead(false);
-        // Dispatch the read to another thread
-        dispatch(onReadAction);
     }
 
     protected void processOnRead()
@@ -234,14 +264,21 @@ public class StandardCoordinator implements Coordinator
     {
     }
 
-    @Override
-    public void onWriteReady()
+    protected void onRemoteClose()
     {
-        // Remove interest in further writes, otherwise the select loop will
-        // continue to notify us that it is ready to write
-        needsWrite(false);
-        // Notify the suspended thread that it can write some more
-        dispatch(onWriteAction);
+        try
+        {
+            getInterceptor().onRemoteClose();
+        }
+        finally
+        {
+            close(StreamType.INPUT_OUTPUT);
+        }
+    }
+
+    protected boolean onRead(ByteBuffer buffer)
+    {
+        return getInterceptor().onRead(buffer);
     }
 
     protected void processOnWrite()
@@ -249,37 +286,9 @@ public class StandardCoordinator implements Coordinator
         getInterceptor().onWrite();
     }
 
-    @Override
-    public void timeoutRead()
-    {
-    }
-
-    @Override
-    public void timeoutWrite()
-    {
-    }
-
-    @Override
-    public void onClose()
-    {
-        dispatch(onCloseAction);
-    }
-
     protected void processOnClose()
     {
         close(StreamType.INPUT_OUTPUT);
-    }
-
-    @Override
-    public void needsRead(boolean needsRead)
-    {
-        getReactor().update(getChannel(), SelectionKey.OP_READ, needsRead);
-    }
-
-    @Override
-    public void needsWrite(boolean needsWrite)
-    {
-        getReactor().update(getChannel(), SelectionKey.OP_WRITE, needsWrite);
     }
 
     @Override
@@ -311,18 +320,6 @@ public class StandardCoordinator implements Coordinator
     {
     }
 
-    protected void onRemoteClose()
-    {
-        try
-        {
-            getInterceptor().onRemoteClose();
-        }
-        finally
-        {
-            close(StreamType.INPUT_OUTPUT);
-        }
-    }
-
     @Override
     public void close(StreamType type)
     {
@@ -340,86 +337,7 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    protected boolean onRead(ByteBuffer buffer)
-    {
-        return getInterceptor().onRead(buffer);
-    }
-
-    protected Interceptor getInterceptor()
-    {
-        return headInterceptor;
-    }
-
-    protected void dispatch(Runnable action)
-    {
-        try
-        {
-            getThreadPool().execute(action);
-        }
-        catch (RejectedExecutionException x)
-        {
-            logger.debug("", x);
-        }
-    }
-
-    private class OnOpenAction implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            processOnOpen();
-        }
-    }
-
-    private class OnReadAction implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            try
-            {
-                processOnRead();
-            }
-            catch (Exception x)
-            {
-                logger.debug("Could not process read", x);
-            }
-        }
-    }
-
-    private class OnWriteAction implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            try
-            {
-                processOnWrite();
-            }
-            catch (Exception x)
-            {
-                logger.info("Could not process write", x);
-            }
-        }
-    }
-
-    private class OnCloseAction implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            try
-            {
-                processOnClose();
-            }
-            catch (Exception x)
-            {
-                logger.info("Could not process close", x);
-            }
-        }
-    }
-
-    private class StandardInterceptor implements Interceptor
+    private class TailInterceptor implements Interceptor
     {
         @Override
         public Interceptor getNext()

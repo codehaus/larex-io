@@ -70,7 +70,7 @@ public class ServerReadsZeroTest extends AbstractTestCase
             @Override
             protected Coordinator newCoordinator(Reactor reactor)
             {
-                return new StandardCoordinator(reactor, getByteBuffers(), getThreadPool())
+                return new DispatchCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                 {
                     @Override
                     protected boolean onRead(ByteBuffer buffer)

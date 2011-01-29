@@ -53,7 +53,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                         @Override
                         protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
+                            return new DispatchCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                             {
                                 public AtomicInteger writes = new AtomicInteger(0);
 

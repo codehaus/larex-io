@@ -16,14 +16,11 @@
 
 package org.codehaus.larex.io;
 
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class TimeoutCoordinator extends StandardCoordinator
 {
-    private final Runnable readTimeoutAction = new ReadTimeoutAction();
-    private final Runnable writeTimeoutAction = new WriteTimeoutAction();
     private final AtomicReference<State> readState = new AtomicReference<State>(State.WAIT);
     private final AtomicReference<State> writeState = new AtomicReference<State>(State.WAIT);
     private final long readTimeout;
@@ -31,9 +28,9 @@ public class TimeoutCoordinator extends StandardCoordinator
     private volatile long readTime;
     private volatile long writeTime;
 
-    public TimeoutCoordinator(Reactor reactor, ByteBuffers byteBuffers, Executor threadPool, long readTimeout, long writeTimeout)
+    public TimeoutCoordinator(Reactor reactor, ByteBuffers byteBuffers, long readTimeout, long writeTimeout)
     {
-        super(reactor, byteBuffers, threadPool);
+        super(reactor, byteBuffers);
         this.readTimeout = readTimeout;
         this.writeTimeout = writeTimeout;
     }
@@ -60,8 +57,13 @@ public class TimeoutCoordinator extends StandardCoordinator
         {
             long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - readTime);
             if (elapsed > readTimeout)
-                dispatch(readTimeoutAction);
+                onReadTimeout();
         }
+    }
+
+    protected void onReadTimeout()
+    {
+        processOnReadTimeout();
     }
 
     @Override
@@ -86,8 +88,13 @@ public class TimeoutCoordinator extends StandardCoordinator
         {
             long elapsed = TimeUnit.NANOSECONDS.toMillis(now() - writeTime);
             if (elapsed > writeTimeout)
-                dispatch(writeTimeoutAction);
+                onWriteTimeout();
         }
+    }
+
+    protected void onWriteTimeout()
+    {
+        processOnWriteTimeout();
     }
 
     @Override
@@ -106,7 +113,7 @@ public class TimeoutCoordinator extends StandardCoordinator
         }
     }
 
-    protected void onReadTimeout()
+    protected void processOnReadTimeout()
     {
         // Skip notification of read timeout in case a concurrent read event happens
         if (readState.compareAndSet(State.WAIT, State.TIMEOUT))
@@ -138,7 +145,7 @@ public class TimeoutCoordinator extends StandardCoordinator
         }
     }
 
-    protected void onWriteTimeout()
+    protected void processOnWriteTimeout()
     {
         // Skip notification of write timeout in case a concurrent write event happens
         if (writeState.compareAndSet(State.WAIT, State.TIMEOUT))
@@ -157,24 +164,6 @@ public class TimeoutCoordinator extends StandardCoordinator
     private long now()
     {
         return System.nanoTime();
-    }
-
-    private class ReadTimeoutAction implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            onReadTimeout();
-        }
-    }
-
-    private class WriteTimeoutAction implements Runnable
-    {
-        @Override
-        public void run()
-        {
-            onWriteTimeout();
-        }
     }
 
     private enum State

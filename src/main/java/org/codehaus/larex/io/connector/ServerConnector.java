@@ -32,10 +32,10 @@ import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Coordinator;
+import org.codehaus.larex.io.DispatchCoordinator;
 import org.codehaus.larex.io.Reactor;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.StandardChannel;
-import org.codehaus.larex.io.TimeoutCoordinator;
 import org.codehaus.larex.io.TimeoutReadWriteReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -304,7 +304,7 @@ public class ServerConnector
 
     protected Coordinator newCoordinator(Reactor reactor)
     {
-        return new TimeoutCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
+        return new DispatchCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout());
     }
 
     protected Channel newChannel(Reactor reactor, SocketChannel channel, Controller controller)

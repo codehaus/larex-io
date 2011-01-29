@@ -121,7 +121,7 @@ public class ClientClosesTest extends AbstractTestCase
             @Override
             protected Coordinator newCoordinator(Reactor reactor)
             {
-                return new TimeoutCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
+                return new DispatchCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                 {
                     @Override
                     protected void processOnRead()
@@ -160,7 +160,7 @@ public class ClientClosesTest extends AbstractTestCase
                         @Override
                         protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
+                            return new DispatchCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
                                 protected void processOnRead()
@@ -288,7 +288,7 @@ public class ClientClosesTest extends AbstractTestCase
                         @Override
                         protected Coordinator newCoordinator()
                         {
-                            return new TimeoutCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
+                            return new DispatchCoordinator(getReactor(), getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                             {
                                 @Override
                                 protected void processOnRead()

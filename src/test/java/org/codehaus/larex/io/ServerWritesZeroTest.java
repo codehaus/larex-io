@@ -83,7 +83,7 @@ public class ServerWritesZeroTest extends AbstractTestCase
             @Override
             protected Coordinator newCoordinator(Reactor reactor)
             {
-                return new StandardCoordinator(reactor, getByteBuffers(), getThreadPool())
+                return new DispatchCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                 {
                     public int doWrite(ByteBuffer buffer) throws RuntimeSocketClosedException
                     {
