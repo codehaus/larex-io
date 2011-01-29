@@ -73,12 +73,12 @@ public class ClientConnector
         return reactor;
     }
 
-    protected Executor getThreadPool()
+    public Executor getThreadPool()
     {
         return threadPool;
     }
 
-    protected ByteBuffers getByteBuffers()
+    public ByteBuffers getByteBuffers()
     {
         return byteBuffers;
     }
