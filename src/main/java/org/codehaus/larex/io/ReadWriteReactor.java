@@ -158,6 +158,12 @@ public class ReadWriteReactor implements Reactor
                     selected = selectNow();
                     if (debug)
                         logger.debug("Reactor loop re-selecting, {}/{} selected", selected, selector.keys().size());
+
+                    // If the selector has notified of an operation interest, and the operation interest
+                    // has not been reset, and the operation has not been performed (for example a read),
+                    // the selector will continue to wake up with selected == 0, but with a non-empty
+                    // selected key set. Assert that this condition does not happen
+                    assert selector.selectedKeys().size() == 0;
                 }
 
                 if (selected > 0)
