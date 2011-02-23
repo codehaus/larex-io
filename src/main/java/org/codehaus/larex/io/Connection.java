@@ -24,7 +24,7 @@ import java.nio.ByteBuffer;
  * <p>These events involve {@link #openEvent() connection opening}, {@link #readEvent(ByteBuffer) read}
  * and {@link #writeEvent() write} events, close events ({@link #remoteCloseEvent() remote} and
  * {@link #closingEvent(StreamType) local}) and timeout events.</p>
- * <p>While {@link Connection} is passive half and receives events from the underlying connection,
+ * <p>While {@link Connection} is the passive half and receives events from the underlying connection,
  * {@link Controller} is the active half and allows to operate on the underlying connection.
  * <p>User code would prefer to extend from {@code Connection} implementations such as
  * {@link StandardConnection} or {@link BlockingConnection}.</p>

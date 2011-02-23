@@ -19,10 +19,11 @@ package org.codehaus.larex.io;
 import java.nio.ByteBuffer;
 
 /**
- * <p>A {@link Controller} provides an API for user code to interact with the remote peer.</p>
+ * <p>{@link Controller} provides the API for user code to operate on the underlying connection
+ * with the remote peer.</p>
  * <p>Where a {@link Connection} is passive and receives I/O events, {@link Controller} is
  * active and allows to control read/write interest, allows to {@link #write(ByteBuffer) write}
- * to the remote peer and to {@link #close(StreamType) close} the connection.</p>
+ * and to {@link #close(StreamType) close} the underlying connection with the remote peer.</p>
  * <p>It also provides user code the ability to add and remove {@link Interceptor}s, which
  * offer fine grained control on the activity happening on the connection.</p>
  */
@@ -31,20 +32,22 @@ public interface Controller
     /**
      * @param size the size of the read buffer
      */
-    void setReadBufferSize(int size);
+    public void setReadBufferSize(int size);
 
     /**
      * <p>Appends the given {@code interceptor} to the queue of interceptors.</p>
+     *
      * @param interceptor the interceptor to add
      */
-    void addInterceptor(Interceptor interceptor);
+    public void addInterceptor(Interceptor interceptor);
 
     /**
      * <p>Removes the given {@code interceptor} from the queue of interceptors.</p>
+     *
      * @param interceptor the interceptor to remove
      * @return true if the interceptor was removed, false otherwise
      */
-    boolean removeInterceptor(Interceptor interceptor);
+    public boolean removeInterceptor(Interceptor interceptor);
 
     /**
      * <p>Asks the I/O system to register (if {@code needsRead} is true) or
@@ -55,7 +58,7 @@ public interface Controller
      * @param needsRead true to indicate that there is interest in receiving read events,
      *                  false to indicate that there is no interest in receiving read events.
      */
-    void needsRead(boolean needsRead);
+    public void needsRead(boolean needsRead);
 
     /**
      * <p>Asks the I/O system to register (if {@code needsWrite} is true) or
@@ -66,19 +69,19 @@ public interface Controller
      * @param needsWrite true to indicate that there is interest in receiving read events,
      *                   false to indicate that there is no interest in receiving read events.
      */
-    void needsWrite(boolean needsWrite);
+    public void needsWrite(boolean needsWrite);
 
     /**
      * <p>Non-blocking writes bytes from the given {@code buffer}.</p>
      * <p>Normally, a connection will call this method after it filled the buffer with bytes
-     * to write, and this coordinator will forward the call to the channel.</p>
+     * to write, and this coordinator will forward the call to the {@link Channel channel}.</p>
      *
      * @param buffer the buffer to write bytes from
      * @return the number of bytes written
      * @throws RuntimeSocketClosedException if the associated channel has been closed
      * @see Channel#write(ByteBuffer)
      */
-    int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
+    public int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 
     /**
      * <p>Closes the given stream type of the channel associated with this coordinator.</p>
@@ -86,5 +89,5 @@ public interface Controller
      * @param type the stream type to close
      * @see Channel#close(StreamType)
      */
-    void close(StreamType type);
+    public void close(StreamType type);
 }
