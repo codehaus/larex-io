@@ -109,10 +109,9 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(controller)
                 {
                     @Override
-                    protected boolean onRead(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
                         flush(ByteBuffer.wrap(new byte[]{1}));
-                        return true;
                     }
                 };
             }
@@ -198,10 +197,9 @@ public class ClientClosesTest extends AbstractTestCase
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected boolean onRead(ByteBuffer buffer)
+                            protected void onRead(ByteBuffer buffer)
                             {
                                 read.set(true);
-                                return true;
                             }
                         };
                     }
@@ -256,10 +254,9 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(controller)
                 {
                     @Override
-                    protected boolean onRead(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
                         flush(ByteBuffer.wrap(new byte[]{1}));
-                        return true;
                     }
 
                     @Override
@@ -318,11 +315,10 @@ public class ClientClosesTest extends AbstractTestCase
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected boolean onRead(ByteBuffer buffer)
+                            protected void onRead(ByteBuffer buffer)
                             {
                                 ClientClosesTest.this.logger.debug("Step 3 releasing");
                                 latch3.countDown();
-                                return true;
                             }
 
                             @Override

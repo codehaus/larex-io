@@ -387,7 +387,7 @@ public class LoadClientMain
         }
 
         @Override
-        protected boolean onRead(ByteBuffer buffer)
+        protected void onRead(ByteBuffer buffer)
         {
             while (buffer.hasRemaining())
             {
@@ -446,8 +446,6 @@ public class LoadClientMain
 
                 }
             }
-
-            return true;
         }
 
         public void send(byte type, byte[] content) throws InterruptedException

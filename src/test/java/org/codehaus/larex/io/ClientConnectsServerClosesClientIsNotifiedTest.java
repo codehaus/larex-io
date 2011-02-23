@@ -98,10 +98,9 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected boolean onRead(ByteBuffer buffer)
+                            protected void onRead(ByteBuffer buffer)
                             {
                                 latch.countDown();
-                                return true;
                             }
 
                             @Override

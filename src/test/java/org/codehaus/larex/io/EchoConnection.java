@@ -29,10 +29,9 @@ public class EchoConnection extends StandardConnection
     }
 
     @Override
-    protected boolean onRead(ByteBuffer buffer)
+    protected void onRead(ByteBuffer buffer)
     {
         flush(buffer);
-        return true;
     }
 
     public static class Factory implements ConnectionFactory<EchoConnection>

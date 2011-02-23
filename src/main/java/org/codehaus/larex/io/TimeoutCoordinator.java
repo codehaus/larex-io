@@ -43,11 +43,12 @@ public class TimeoutCoordinator extends StandardCoordinator
     }
 
     @Override
-    protected void readEnd(int read, boolean needsRead)
+    protected boolean readEnd()
     {
+        boolean needsRead = super.readEnd();
         if (needsRead)
             readTime = now();
-        super.readEnd(read, needsRead);
+        return needsRead;
     }
 
     public void timeoutRead()

@@ -56,7 +56,7 @@ public abstract class BlockingConnection extends FlushableConnection
      * @param buffer the buffer containing the bytes read
      */
     @Override
-    public final boolean onRead(ByteBuffer buffer)
+    public final void onRead(ByteBuffer buffer)
     {
         // TODO: fix this: if this.buffer is small we copy, notify,
         // TODO: but this method is called again because there is more data to read
@@ -67,7 +67,6 @@ public abstract class BlockingConnection extends FlushableConnection
             readState = ReadState.READ;
             notify();
         }
-        return true;
     }
 
     /**

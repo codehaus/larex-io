@@ -34,17 +34,32 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final boolean readEvent(ByteBuffer buffer)
+    public final void readEvent(ByteBuffer buffer)
     {
         doOnRead(buffer);
-        return onRead(buffer);
+        onRead(buffer);
     }
 
     void doOnRead(ByteBuffer buffer)
     {
     }
 
-    protected boolean onRead(ByteBuffer buffer)
+    protected void onRead(ByteBuffer buffer)
+    {
+    }
+
+    @Override
+    public final boolean readEndEvent()
+    {
+        doOnReadEnd();
+        return onReadEnd();
+    }
+
+    void doOnReadEnd()
+    {
+    }
+
+    protected boolean onReadEnd()
     {
         return true;
     }

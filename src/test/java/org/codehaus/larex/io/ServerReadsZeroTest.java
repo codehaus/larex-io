@@ -73,11 +73,10 @@ public class ServerReadsZeroTest extends AbstractTestCase
                 return new DispatchCoordinator(reactor, getByteBuffers(), getThreadPool(), getReadTimeout(), getWriteTimeout())
                 {
                     @Override
-                    protected boolean onRead(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
                         super.onRead(buffer);
                         reads.countDown();
-                        return true;
                     }
 
                     public void needsRead(boolean needsRead)

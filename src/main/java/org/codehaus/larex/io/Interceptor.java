@@ -31,7 +31,9 @@ public interface Interceptor
 
     void onReadTimeout();
 
-    boolean onRead(ByteBuffer buffer);
+    void onRead(ByteBuffer buffer);
+
+    boolean onReadEnd();
 
     void onWrite();
 
@@ -77,9 +79,15 @@ public interface Interceptor
         }
 
         @Override
-        public boolean onRead(ByteBuffer buffer)
+        public void onRead(ByteBuffer buffer)
         {
-            return getNext().onRead(buffer);
+            getNext().onRead(buffer);
+        }
+
+        @Override
+        public boolean onReadEnd()
+        {
+            return getNext().onReadEnd();
         }
 
         @Override

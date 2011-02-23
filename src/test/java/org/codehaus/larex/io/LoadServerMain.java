@@ -130,7 +130,7 @@ public class LoadServerMain
         }
 
         @Override
-        protected boolean onRead(ByteBuffer buffer)
+        protected void onRead(ByteBuffer buffer)
         {
             while (buffer.hasRemaining())
             {
@@ -176,16 +176,16 @@ public class LoadServerMain
                 }
             }
             buffer.flip();
-            return super.onRead(buffer);
+            super.onRead(buffer);
         }
 
         private static class StatisticsInterceptor extends Interceptor.Forwarder
         {
             @Override
-            public boolean onRead(ByteBuffer buffer)
+            public void onRead(ByteBuffer buffer)
             {
                 reads.incrementAndGet();
-                return super.onRead(buffer);
+                super.onRead(buffer);
             }
 
             @Override

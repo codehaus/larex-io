@@ -98,7 +98,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public boolean onRead(ByteBuffer sslBuffer)
+    public void onRead(ByteBuffer sslBuffer)
     {
         logger.debug("Reading {}", sslBuffer);
         int bufferSize = sslEngine.getSession().getApplicationBufferSize();
@@ -132,10 +132,13 @@ public class SSLInterceptor extends Interceptor.Forwarder
                 }
             }
 
+            // TODO: fix this
+/*
             if (handshaking)
                 return true;
 
             return decryptData(sslBuffer, buffer);
+*/
         }
         catch (SSLException x)
         {
@@ -150,7 +153,9 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
     private boolean decryptData(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException
     {
+        // TODO: fix this
         boolean readMore = true;
+
         int bufferSize = sslEngine.getSession().getApplicationBufferSize();
         out: while (sslBuffer.hasRemaining())
         {
@@ -167,7 +172,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
                     buffer.flip();
                     // Forward the call with the unencrypted bytes
                     logger.debug("Forwarding read event of {} bytes", buffer.remaining());
-                    readMore = super.onRead(buffer);
+                    super.onRead(buffer);
                     // Cleanup the buffer
                     buffer.clear();
                     buffer.limit(bufferSize);

@@ -198,12 +198,11 @@ public class SSLServerConnectorTest extends AbstractTestCase
                 return new EchoConnection(controller)
                 {
                     @Override
-                    protected boolean onRead(ByteBuffer buffer)
+                    protected void onRead(ByteBuffer buffer)
                     {
                         reads.incrementAndGet();
-                        boolean result = super.onRead(buffer);
+                        super.onRead(buffer);
                         close(StreamType.INPUT);
-                        return result;
                     }
 
                     @Override

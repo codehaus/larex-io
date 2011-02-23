@@ -314,6 +314,7 @@ public class StandardChannel implements Channel, Runnable
             }
             catch (InterruptedException x)
             {
+                Thread.currentThread().interrupt();
                 throw new RuntimeIOException(x);
             }
         }
@@ -351,6 +352,7 @@ public class StandardChannel implements Channel, Runnable
             }
             catch (InterruptedException x)
             {
+                Thread.currentThread().interrupt();
                 throw new RuntimeIOException(x);
             }
         }
@@ -395,6 +397,7 @@ public class StandardChannel implements Channel, Runnable
             }
             catch (InterruptedException x)
             {
+                Thread.currentThread().interrupt();
                 throw new RuntimeIOException(x);
             }
         }

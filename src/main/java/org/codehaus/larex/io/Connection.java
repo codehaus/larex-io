@@ -32,48 +32,63 @@ import java.nio.ByteBuffer;
 public interface Connection
 {
     /**
-     * <p>Callback method called after the connection has been opened.</p>
+     * <p>Callback method invoked after the connection has been opened.</p>
      */
     public void openEvent();
 
     /**
-     * <p>Callback method called when this connection has read bytes sent from the remote peer.</p>
+     * <p>Callback method invoked when this connection has read bytes sent from the remote peer.</p>
+     * <p>This method may be called multiple times, for example because the read buffer is smaller
+     * than the data available.</p>
+     * <p>When the data available has been completely read for the time being, {@link #readEndEvent()}
+     * will be called.</p>
      *
      * @param buffer the buffer containing the bytes read
-     * @return whether to be notified of future read events or not
+     * @see #readEndEvent()
      */
-    public boolean readEvent(ByteBuffer buffer);
+    public void readEvent(ByteBuffer buffer);
 
     /**
-     * <p>Callback method called when this connection times out while waiting to read bytes.<p>
+     * <p>Callback method invoked when this connection has finished to read bytes from the remote
+     * peer.</p>
+     * <p>This method is invoked after {@link #readEvent(ByteBuffer)} when the data available has
+     * been completely read for the time being. </p>
+     *
+     * @return whether to set read interest to receive further read events
+     * @see #readEvent(ByteBuffer)
+     */
+    public boolean readEndEvent();
+
+    /**
+     * <p>Callback method invoked when this connection times out while waiting to read bytes.<p>
      */
     public void readTimeoutEvent();
 
     /**
-     * <p>Callback method called when this connection is again ready to write, after having been
+     * <p>Callback method invoked when this connection is again ready to write, after having been
      * write blocked.</p>
      */
     public void writeEvent();
 
     /**
-     * <p>Callback method called when this connection times out while waiting to write bytes.<p>
+     * <p>Callback method invoked when this connection times out while waiting to write bytes.<p>
      */
     public void writeTimeoutEvent();
 
     /**
-     * <p>Callback method called when this connection detects that the remote end has been closed.</p>
+     * <p>Callback method invoked when this connection detects that the remote end has been closed.</p>
      */
     public void remoteCloseEvent();
 
     /**
-     * <p>Callback called when this connection is about to be closed.</p>
+     * <p>Callback method invoked when this connection is about to be closed.</p>
      *
      * @param type the stream type that is about to close
      */
     public void closingEvent(StreamType type);
 
     /**
-     * <p>Callback called when this connection has been closed.</p>
+     * <p>Callback method invoked when this connection has been closed.</p>
      *
      * @param type the stream type that has been closed
      */

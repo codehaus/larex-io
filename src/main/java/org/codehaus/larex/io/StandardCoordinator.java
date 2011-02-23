@@ -175,12 +175,9 @@ public class StandardCoordinator implements Coordinator
 
     protected void processOnRead()
     {
-        boolean debug = logger.isDebugEnabled();
+        final boolean debug = logger.isDebugEnabled();
 
-        int read;
-        int totalRead = 0;
         boolean closed;
-        boolean readMore = true;
 
         readBegin();
 
@@ -204,29 +201,28 @@ public class StandardCoordinator implements Coordinator
             {
                 int start = buffer.position();
                 closed = read(buffer);
-                read = buffer.position() - start;
-                totalRead += read;
+                int read = buffer.position() - start;
 
                 if (read > 0)
                 {
                     if (debug)
                         logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
                     buffer.flip();
-                    readMore = onRead(buffer);
+                    onRead(buffer);
                     buffer.clear();
                     buffer.limit(readBufferSize);
                 }
 
-                if (!readMore || read == 0 || closed)
+                if (read == 0 || closed)
                     break;
             }
         }
         finally
         {
             getByteBuffers().release(buffer);
-
-            readEnd(totalRead, readMore);
         }
+
+        boolean readMore = readEnd();
 
         if (closed)
         {
@@ -260,8 +256,9 @@ public class StandardCoordinator implements Coordinator
         return getChannel().read(buffer);
     }
 
-    protected void readEnd(int read, boolean needsRead)
+    protected boolean readEnd()
     {
+        return getInterceptor().onReadEnd();
     }
 
     protected void onRemoteClose()
@@ -276,9 +273,9 @@ public class StandardCoordinator implements Coordinator
         }
     }
 
-    protected boolean onRead(ByteBuffer buffer)
+    protected void onRead(ByteBuffer buffer)
     {
-        return getInterceptor().onRead(buffer);
+        getInterceptor().onRead(buffer);
     }
 
     protected void processOnWrite()
@@ -378,17 +375,22 @@ public class StandardCoordinator implements Coordinator
         }
 
         @Override
-        public boolean onRead(ByteBuffer buffer)
+        public void onRead(ByteBuffer buffer)
         {
             try
             {
-                return getConnection().readEvent(buffer);
+                getConnection().readEvent(buffer);
             }
             catch (Exception x)
             {
                 logger.info("Unexpected exception in Interceptor.onRead", x);
-                return true;
             }
+        }
+
+        @Override
+        public boolean onReadEnd()
+        {
+            return getConnection().readEndEvent();
         }
 
         @Override
