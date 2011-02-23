@@ -20,28 +20,29 @@ import java.nio.ByteBuffer;
 
 /**
  * <p>A provider of {@link ByteBuffer}s.</p>
- *
- * @version $Revision$ $Date$
+ * <p>Acquired {@link ByteBuffer}s may be released but need not to;
+ * if they are released they may be recycled and reused, otherwise
+ * they will be garbage collected normally.</p>
  */
 public interface ByteBuffers
 {
     /**
      * <p>Requests a {@link ByteBuffer} of the given size.</p>
-     * <p>The returned buffer may have a bigger capacity but will be limited
-     * to the given size.</p>
+     * <p>The returned buffer may have a bigger capacity but will have
+     * its limit set to the given size.</p>
      *
      * @param size   the size of the buffer
      * @param direct whether the buffer must be direct or not
      * @return the requested buffer
      * @see #release(ByteBuffer)
      */
-    ByteBuffer acquire(int size, boolean direct);
+    public ByteBuffer acquire(int size, boolean direct);
 
     /**
-     * Returns the {@link ByteBuffer} requested with {@link #acquire(int, boolean)}.
+     * <p>Returns the {@link ByteBuffer} requested with {@link #acquire(int, boolean)}.</p>
      *
      * @param buffer the buffer to return
      * @see #acquire(int, boolean)
      */
-    void release(ByteBuffer buffer);
+    public void release(ByteBuffer buffer);
 }

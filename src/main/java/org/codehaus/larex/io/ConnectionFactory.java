@@ -18,8 +18,6 @@ package org.codehaus.larex.io;
 
 /**
  * The factory for {@link Connection} instances.
- *
- * @version $Revision: 903 $ $Date$
  */
 public interface ConnectionFactory<T extends Connection>
 {
@@ -27,5 +25,5 @@ public interface ConnectionFactory<T extends Connection>
      * @param controller the controller object to be associated with the connection
      * @return the new connection
      */
-    T newConnection(Controller controller);
+    public T newConnection(Controller controller);
 }

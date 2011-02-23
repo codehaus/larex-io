@@ -21,7 +21,15 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.Selector;
 
 /**
- * <p>{@link Channel} hides the complexity of working with {@link SelectableChannel}s.</p>
+ * <p>A {@link Channel} wraps a {@link SelectableChannel}, offering a simpler
+ * programming interface to work with.</p>
+ * <p>{@link Channel}s are registered with a {@link Selector}, and differently
+ * from the {@code java.nio} API they can be also unregistered, providing symmetry
+ * to the API.<br />
+ * Registration and unregistration are performed in the proper thread transparently
+ * to avoid lockups with the {@link Reactor} thread.</p>
+ * <p> {@link Channel}s input and output streams may be closed independently or
+ * together.</p>
  */
 public interface Channel
 {
@@ -33,7 +41,7 @@ public interface Channel
      * @param listener the attachment of the registration
      * @return whether the registration has been successful
      * @throws RuntimeSocketClosedException if this channel has been closed
-     * @see java.nio.channels.SelectableChannel#register(Selector , int, Object)
+     * @see java.nio.channels.SelectableChannel#register(Selector, int, Object)
      * @see #unregister(Selector, Reactor.Listener)
      */
     public boolean register(Selector selector, Reactor.Listener listener) throws RuntimeSocketClosedException;
@@ -49,6 +57,7 @@ public interface Channel
 
     /**
      * <p>Unregisters this channel from the given {@code selector}.</p>
+     *
      * @param selector the selector this channel was registered with
      * @param listener the attachment of the registration
      * @return whether the unregistration has been successful
@@ -58,8 +67,11 @@ public interface Channel
 
     /**
      * <p>Reads bytes from this channel into the given buffer.</p>
-     * <p>The number of bytes read can be determined using the buffer, and it may not be
-     * the case that if this method returns true, then no bytes have been read.</p>
+     * <p>The number of bytes read can be determined using the buffer's position
+     * before and after the read.<br/>
+     * This method returns true if the underlying channel has been closed, but
+     * it may be possible that before the close bytes have been read into the
+     * given {@code buffer}.</p>
      *
      * @param buffer the buffer to read into
      * @return true if the remote end was closed, false otherwise
