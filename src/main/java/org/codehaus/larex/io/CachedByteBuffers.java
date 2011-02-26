@@ -29,8 +29,6 @@ import java.util.concurrent.ConcurrentMap;
  * Therefore, if the factor is 1024 (the default) and a request for size 2500 arrives,
  * then a buffer of capacity 3072 (1024 * 3) is created and returned.
  * If, later on, a request for size 3000 arrives, the same buffer is returned.</p>
- *
- * @version $Revision$ $Date$
  */
 public class CachedByteBuffers implements ByteBuffers
 {

@@ -27,7 +27,7 @@ import org.codehaus.larex.io.Reactor;
 import org.codehaus.larex.io.TimeoutReadWriteReactor;
 
 /**
- * @version $Revision$ $Date$
+ *
  */
 public class ClientConnector
 {

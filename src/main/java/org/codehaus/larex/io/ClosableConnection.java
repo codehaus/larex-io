@@ -35,15 +35,13 @@ import org.slf4j.LoggerFactory;
  * detects this ({@link #remoteCloseEvent()} is invoked, or equivalently a raw socket would read -1),
  * and may optionally decide to write the last data before hard closing the connection.<br />
  * The connection reads the last data sent by the remote end, then detects that the remote end
- * was closed and can now hard close the connection.<br />
- * Note however that the remote end cannot know if the connection was soft closed or hard closed,
+ * was closed and can now hard close the connection.</p>
+ * <p>Note however that the remote end cannot know if the connection was soft closed or hard closed,
  * so it must be prepared to failures when writing the last data.</p>
- *
- * @version $Revision$ $Date$
  */
 public abstract class ClosableConnection extends AbstractConnection
 {
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
+    protected static final Logger logger = LoggerFactory.getLogger(Connection.class);
     private final Controller controller;
     private volatile CountDownLatch softClose;
 

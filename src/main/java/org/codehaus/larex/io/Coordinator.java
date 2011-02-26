@@ -21,8 +21,6 @@ package org.codehaus.larex.io;
  * the {@link Connection} and the {@link Reactor}.</p>
  * <p>{@link Coordinator} receives I/O events from the {@link Reactor}, and
  * dispatches them appropriately to either the {@link Channel} or the {@link Connection}.</p>
- *
- * @version $Revision: 903 $ $Date$
  */
 public interface Coordinator extends Reactor.Listener, Controller
 {

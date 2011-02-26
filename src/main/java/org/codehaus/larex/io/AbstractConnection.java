@@ -18,6 +18,10 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 
+/**
+ * <p>Partial implementation of {@link Connection} that defines
+ * an API that subclasses override to implement specific behavior.</p>
+ */
 public class AbstractConnection implements Connection
 {
     public final void openEvent()
@@ -30,6 +34,9 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when the connection is opened</p>
+     */
     protected void onOpen()
     {
     }
@@ -44,6 +51,13 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when data has been read from the remote
+     * peer into the given {@code buffer}.</p>
+     *
+     * @param buffer the buffer containing the bytes read
+     * @see #onReadEnd()
+     */
     protected void onRead(ByteBuffer buffer)
     {
     }
@@ -59,6 +73,16 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when there is no more data to read from the
+     * time being.</p>
+     * <p>This method must return whether the framework must set read interest
+     * to receive further read events.</p>
+     * <p>By default, this method returns true.</p>
+     *
+     * @return whether to set read interest
+     * @see #onRead(ByteBuffer)
+     */
     protected boolean onReadEnd()
     {
         return true;
@@ -74,6 +98,9 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when the read times out.</p>
+     */
     protected void onReadTimeout()
     {
     }
@@ -88,6 +115,10 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when the underlying connection is ready
+     * to write again.</p>
+     */
     protected void onWrite()
     {
     }
@@ -102,6 +133,9 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when the write times out.</p>
+     */
     protected void onWriteTimeout()
     {
     }
@@ -116,6 +150,10 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked when it is detected that the remote peer
+     * has closed the underlying connection.</p>
+     */
     protected void onRemoteClose()
     {
     }
@@ -130,6 +168,12 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked invoked just before the underlying connection
+     * is being closed locally.</p>
+     *
+     * @param type the stream type that is about to be closed
+     */
     protected void onClosing(StreamType type)
     {
     }
@@ -144,6 +188,12 @@ public class AbstractConnection implements Connection
     {
     }
 
+    /**
+     * <p>Callback method invoked just after the underlying connection
+     * is closed locally.</p>
+     *
+     * @param type the stream type that has been closed
+     */
     protected void onClosed(StreamType type)
     {
     }

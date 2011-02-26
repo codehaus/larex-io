@@ -21,7 +21,7 @@ import java.net.InetSocketAddress;
 import org.codehaus.larex.io.Connection;
 
 /**
- * @version $Revision$ $Date$
+ *
  */
 public abstract class Endpoint<T extends Connection>
 {
