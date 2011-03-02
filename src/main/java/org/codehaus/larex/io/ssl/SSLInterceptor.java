@@ -28,9 +28,12 @@ import org.codehaus.larex.io.Interceptor;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.RuntimeSocketClosedException;
 import org.codehaus.larex.io.StreamType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SSLInterceptor extends Interceptor.Forwarder
 {
+    private static final Logger logger = LoggerFactory.getLogger(SSLInterceptor.class);
     private final ByteBuffers sslByteBuffers;
     private final SSLEngine sslEngine;
     private final Controller controller;
