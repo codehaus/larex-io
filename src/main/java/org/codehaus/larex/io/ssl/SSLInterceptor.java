@@ -21,7 +21,7 @@ import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 
-import org.codehaus.larex.io.BlockingFlusher;
+import org.codehaus.larex.io.BlockingWriter;
 import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.Interceptor;
@@ -34,7 +34,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
     private final ByteBuffers sslByteBuffers;
     private final SSLEngine sslEngine;
     private final Controller controller;
-    private final SSLFlusher flusher;
+    private final SSLWriter flusher;
     private volatile boolean handshaking = true;
     private volatile ByteBuffer sslBuffer;
 
@@ -43,7 +43,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         this.sslByteBuffers = sslByteBuffers;
         this.sslEngine = sslEngine;
         this.controller = controller;
-        this.flusher = new SSLFlusher(controller);
+        this.flusher = new SSLWriter(controller);
     }
 
     @Override
@@ -524,23 +524,17 @@ public class SSLInterceptor extends Interceptor.Forwarder
         super.onClosing(type);
     }
 
-    private class SSLFlusher extends BlockingFlusher
+    private class SSLWriter extends BlockingWriter
     {
-        private SSLFlusher(Controller controller)
+        private SSLWriter(Controller controller)
         {
             super(controller);
         }
 
         @Override
-        protected int write(ByteBuffer buffer)
+        protected int write(Controller controller, ByteBuffer buffer)
         {
             return SSLInterceptor.super.write(buffer);
-        }
-
-        @Override
-        protected void close()
-        {
-            SSLInterceptor.this.controller.close(StreamType.INPUT_OUTPUT);
         }
     }
 }

@@ -16,9 +16,16 @@
 
 package org.codehaus.larex.io;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * <p>Concrete implementation of {@link Connection} that inherits close and
+ * blocking flush functionalities.</p>
+ * <p>User code normally extends this class to provide its own logic in
+ * {@link #onRead(ByteBuffer)} which, in this class, does nothing.</p>
+ */
 public class StandardConnection extends FlushableConnection
 {
     private final CountDownLatch ready = new CountDownLatch(1);
@@ -35,11 +42,22 @@ public class StandardConnection extends FlushableConnection
         ready.countDown();
     }
 
-    public boolean awaitReady(long timeout) throws InterruptedException
+    /**
+     * <p>Awaits the given {@code timeout} (in milliseconds) for this connection
+     * to be opened.</p>
+     * @param timeout the maximum time to wait for this connection to be opened
+     * @return whether the connection opened within the given {@code timeout}
+     * @throws InterruptedException if the thread waiting for the connection to
+     * open is interrupted by another thread
+     */
+    public boolean awaitOpened(long timeout) throws InterruptedException
     {
         return ready.await(timeout, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * The factory that creates instances of {@link StandardConnection}.
+     */
     public static class Factory implements ConnectionFactory<StandardConnection>
     {
         @Override

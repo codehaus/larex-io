@@ -104,7 +104,7 @@ public class StandardCoordinator implements Coordinator
         // Remove interest in further writes, otherwise the select loop will
         // continue to notify us that it is ready to write
         needsWrite(false);
-        // Notify the suspended thread that it can write some more
+        // Write some more
         processOnWrite();
     }
 
@@ -175,12 +175,6 @@ public class StandardCoordinator implements Coordinator
 
     protected void processOnRead()
     {
-        final boolean debug = logger.isDebugEnabled();
-
-        boolean closed;
-
-        readBegin();
-
         // Reads are performed by the JVM in a temporary direct buffer, then copied
         // into the buffer passed to SocketChannel.read(Buffer).
         // In general there is no big savings in having the read buffer to be direct
@@ -191,59 +185,74 @@ public class StandardCoordinator implements Coordinator
         // So we use a direct buffer here to read, to exploit the possible JVM
         // optimization, and to allow the user code to use this buffer as the write
         // buffer (read from it, clear it, fill it with data, write it).
-        int readBufferSize = getReadBufferSize();
-        ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, true);
+
+        // Handle exceptions here, since we do not want
+        // the exception to arrive to the reactor
         try
         {
-            // The buffer can be smaller than the data available,
-            // therefore we read until we cannot read anymore.
-            while (true)
-            {
-                int start = buffer.position();
-                closed = read(buffer);
-                int read = buffer.position() - start;
+            final boolean debug = logger.isDebugEnabled();
 
-                if (read > 0)
+            readBegin();
+
+            boolean closed;
+            int readBufferSize = getReadBufferSize();
+            ByteBuffer buffer = getByteBuffers().acquire(readBufferSize, true);
+            try
+            {
+                // The buffer can be smaller than the data available,
+                // therefore we read until we cannot read anymore.
+                while (true)
+                {
+                    int start = buffer.position();
+                    closed = read(buffer);
+                    int read = buffer.position() - start;
+
+                    if (read > 0)
+                    {
+                        if (debug)
+                            logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
+                        buffer.flip();
+                        onRead(buffer);
+                        buffer.clear();
+                        buffer.limit(readBufferSize);
+                    }
+
+                    if (read == 0 || closed)
+                        break;
+                }
+            }
+            finally
+            {
+                getByteBuffers().release(buffer);
+            }
+
+            boolean readMore = readEnd();
+
+            if (closed)
+            {
+                // If the input is closed by user code, reading returns -1,
+                // but that's different from a remote close that also returns -1
+                if (channel.isClosed(StreamType.INPUT))
                 {
                     if (debug)
-                        logger.debug("Channel {} read {} bytes into {}", new Object[]{getChannel(), read, buffer});
-                    buffer.flip();
-                    onRead(buffer);
-                    buffer.clear();
-                    buffer.limit(readBufferSize);
+                        logger.debug("Channel {} closed locally", getChannel());
                 }
-
-                if (read == 0 || closed)
-                    break;
-            }
-        }
-        finally
-        {
-            getByteBuffers().release(buffer);
-        }
-
-        boolean readMore = readEnd();
-
-        if (closed)
-        {
-            // If the input is closed by user code, reading returns -1,
-            // but that's different from a remote close that also returns -1
-            if (channel.isClosed(StreamType.INPUT))
-            {
-                if (debug)
-                    logger.debug("Channel {} closed locally", getChannel());
+                else
+                {
+                    if (debug)
+                        logger.debug("Channel {} closed remotely", getChannel());
+                    onRemoteClose();
+                }
+                needsRead(false);
             }
             else
             {
-                if (debug)
-                    logger.debug("Channel {} closed remotely", getChannel());
-                onRemoteClose();
+                needsRead(readMore);
             }
-            needsRead(false);
         }
-        else
+        catch (Exception x)
         {
-            needsRead(readMore);
+            logger.debug("Could not process read", x);
         }
     }
 
@@ -280,7 +289,16 @@ public class StandardCoordinator implements Coordinator
 
     protected void processOnWrite()
     {
-        getInterceptor().onWrite();
+        // Handle exceptions here, since we do not want
+        // the exception to arrive to the reactor
+        try
+        {
+            getInterceptor().onWrite();
+        }
+        catch (Exception x)
+        {
+            logger.info("Could not process write", x);
+        }
     }
 
     protected void processOnClose()
@@ -332,6 +350,12 @@ public class StandardCoordinator implements Coordinator
         {
             getInterceptor().onClosed(type);
         }
+    }
+
+    @Override
+    public boolean isClosed(StreamType type)
+    {
+        return getChannel().isClosed(type);
     }
 
     private class TailInterceptor implements Interceptor

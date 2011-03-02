@@ -75,7 +75,7 @@ public class StandardClientConnectorTest extends AbstractTestCase
                 });
 
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                assertTrue(connection.awaitReady(1000));
+                assertTrue(connection.awaitOpened(1000));
                 try
                 {
                     assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));

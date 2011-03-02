@@ -23,53 +23,37 @@ import java.nio.ByteBuffer;
  * and inherits close functionalities.</p>
  * <p>Writes can be non-blocking (via {@link #write(ByteBuffer)}), or blocking (via
  * {@link #flush(ByteBuffer)}.</p>
- *
- * @version $Revision$ $Date$
  */
 public abstract class FlushableConnection extends ClosableConnection
 {
-    private final BlockingFlusher flusher;
+    private final BlockingWriter writer;
 
     protected FlushableConnection(Controller controller)
     {
         super(controller);
-        this.flusher = new ConnectionFlusher(controller);
-    }
-
-    /**
-     * <p>Copies the given source buffer into a new buffer.</p>
-     *
-     * @param source the buffer to copy
-     * @return the copied buffer
-     */
-    public ByteBuffer copy(ByteBuffer source)
-    {
-        ByteBuffer result = ByteBuffer.allocate(source.remaining());
-        result.put(source);
-        result.flip();
-        return result;
+        this.writer = new BlockingWriter(controller);
     }
 
     @Override
     void doOnWrite()
     {
         super.doOnWrite();
-        flusher.writeReadyEvent();
+        writer.writeReadyEvent();
     }
 
     @Override
     void doOnWriteTimeout()
     {
         super.doOnWriteTimeout();
-        flusher.writeTimeoutEvent();
+        writer.writeTimeoutEvent();
     }
 
     @Override
-    void doClose(StreamType type)
+    void doOnClosing(StreamType type)
     {
-        super.doClose(type);
+        super.doOnClosing(type);
         if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
-            flusher.closeEvent();
+            writer.closeEvent();
     }
 
     /**
@@ -83,7 +67,7 @@ public abstract class FlushableConnection extends ClosableConnection
      */
     public final void flush(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
     {
-        flusher.flush(buffer);
+        writer.flush(buffer);
     }
 
     /**
@@ -95,25 +79,5 @@ public abstract class FlushableConnection extends ClosableConnection
     public final int write(ByteBuffer buffer)
     {
         return getController().write(buffer);
-    }
-
-    private class ConnectionFlusher extends BlockingFlusher
-    {
-        private ConnectionFlusher(Controller controller)
-        {
-            super(controller);
-        }
-
-        @Override
-        protected int write(ByteBuffer buffer)
-        {
-            return FlushableConnection.this.write(buffer);
-        }
-
-        @Override
-        protected void close()
-        {
-            FlushableConnection.this.close();
-        }
     }
 }

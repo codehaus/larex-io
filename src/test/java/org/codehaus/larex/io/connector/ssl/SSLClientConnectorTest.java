@@ -108,7 +108,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
             assertNotNull(sslEngine);
 
             assertTrue(handshakeLatch.await(1000, TimeUnit.MILLISECONDS));
-            assertTrue(connection.awaitReady(1000));
+            assertTrue(connection.awaitOpened(1000));
             assertEquals(SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING, sslEngine.getHandshakeStatus());
         }
         finally
@@ -323,7 +323,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
             SSLEngine sslEngine = sslEndpoint.getSSLEngine();
             assertNotNull(sslEngine);
 
-            assertTrue(connection.awaitReady(1000));
+            assertTrue(connection.awaitOpened(1000));
 
             connection.flush(ByteBuffer.wrap(clientMessage.getBytes("UTF-8")));
             assertTrue(serverLatch.await(1000, TimeUnit.MILLISECONDS));
@@ -415,7 +415,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
             SSLEngine sslEngine = sslEndpoint.getSSLEngine();
             assertNotNull(sslEngine);
 
-            assertTrue(connection.awaitReady(1000));
+            assertTrue(connection.awaitOpened(1000));
 
             connection.flush(ByteBuffer.wrap(content.toString().getBytes("UTF-8")));
 
@@ -473,7 +473,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
                 }
             }).connect(address);
 
-            assertTrue(connection.awaitReady(1000));
+            assertTrue(connection.awaitOpened(1000));
 
             String request = "" +
                     "GET / HTTP/1.1\r\n" +
@@ -574,7 +574,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
                 }
             });
             StandardConnection connection = sslEndpoint.connect(new InetSocketAddress("localhost", sslServerSocket.getLocalPort()));
-            assertTrue(connection.awaitReady(1000));
+            assertTrue(connection.awaitOpened(1000));
 
             connection.flush(Charset.forName("UTF-8").encode(clientMessage));
 

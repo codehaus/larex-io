@@ -21,9 +21,6 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * <p>Partial implementation of {@link Connection} that provides close functionalities.</p>
  * <p>Closing a connection can be done in two ways: hard closing the connection, or soft
@@ -41,7 +38,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class ClosableConnection extends AbstractConnection
 {
-    protected static final Logger logger = LoggerFactory.getLogger(Connection.class);
     private final Controller controller;
     private volatile CountDownLatch softClose;
 
@@ -77,12 +73,7 @@ public abstract class ClosableConnection extends AbstractConnection
      */
     public final void close(StreamType type)
     {
-        doClose(type);
         getController().close(type);
-    }
-
-    void doClose(StreamType type)
-    {
     }
 
     /**
@@ -103,18 +94,30 @@ public abstract class ClosableConnection extends AbstractConnection
      *
      * @param timeout the timeout to wait, in milliseconds, for the remote end to close the connection
      * @return true if the connection was soft closed, false if it was hard closed
-     * @throws InterruptedException if interrupted while waiting
      * @see #close()
      */
-    public final boolean softClose(long timeout) throws InterruptedException
+    public final boolean softClose(long timeout)
     {
         CountDownLatch softClose = new CountDownLatch(1);
         this.softClose = softClose;
         close(StreamType.OUTPUT);
-        boolean result = softClose.await(timeout, TimeUnit.MILLISECONDS);
+        boolean result = awaitSoftClose(softClose, timeout);
         this.softClose = null;
         if (!result)
             close();
         return result;
+    }
+
+    private boolean awaitSoftClose(CountDownLatch softClose, long timeout)
+    {
+        try
+        {
+            return softClose.await(timeout, TimeUnit.MILLISECONDS);
+        }
+        catch (InterruptedException x)
+        {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 }

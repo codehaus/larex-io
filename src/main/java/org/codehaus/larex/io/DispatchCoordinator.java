@@ -110,14 +110,7 @@ public class DispatchCoordinator extends TimeoutCoordinator
         @Override
         public void run()
         {
-            try
-            {
-                processOnRead();
-            }
-            catch (Exception x)
-            {
-                logger.debug("Could not process read", x);
-            }
+            processOnRead();
         }
     }
 
@@ -126,14 +119,7 @@ public class DispatchCoordinator extends TimeoutCoordinator
         @Override
         public void run()
         {
-            try
-            {
-                processOnWrite();
-            }
-            catch (Exception x)
-            {
-                logger.info("Could not process write", x);
-            }
+            processOnWrite();
         }
     }
 

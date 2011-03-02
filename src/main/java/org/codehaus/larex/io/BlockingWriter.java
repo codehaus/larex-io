@@ -26,28 +26,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TODO: have a threadless version of the flusher
- * @version $Revision$ $Date$
+ *
  */
-public abstract class BlockingFlusher
+public class BlockingWriter
 {
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
+    private static final Logger logger = LoggerFactory.getLogger(BlockingWriter.class);
     private final Lock flushLock = new ReentrantLock();
     private final Condition flushCondition = flushLock.newCondition();
-    private final Controller coordinator;
-    /**
-     * Field updates are guarded by {@link #flushLock}
-     */
+    private final Controller controller;
+    /* Guarded by #flushLock */
     private FlushState flushState = FlushState.WRITE;
 
-    protected BlockingFlusher(Controller controller)
+    protected BlockingWriter(Controller controller)
     {
-        this.coordinator = controller;
+        this.controller = controller;
     }
 
-    protected abstract int write(ByteBuffer buffer);
-
-    protected abstract void close();
+    protected int write(Controller controller, ByteBuffer buffer)
+    {
+        return controller.write(buffer);
+    }
 
     public void writeReadyEvent()
     {
@@ -91,18 +89,15 @@ public abstract class BlockingFlusher
         }
     }
 
-    private void needsWrite()
-    {
-        coordinator.needsWrite(true);
-    }
-
     public void flush(ByteBuffer buffer)
     {
+        final boolean debug = logger.isDebugEnabled();
+
         while (buffer.hasRemaining())
         {
-            int written = write(buffer);
-            if (logger.isDebugEnabled())
-                logger.debug("{} flushed {} bytes", this, written);
+            int written = write(controller, buffer);
+            if (debug)
+                logger.debug("{} written {} bytes", this, written);
 
             if (buffer.hasRemaining())
             {
@@ -114,32 +109,33 @@ public abstract class BlockingFlusher
                         throw new RuntimeSocketClosedException();
 
                     flushState = FlushState.WAIT;
+
                     // We must issue the needsWrite() below within the sync block, otherwise
                     // another thread can issue a notify that no one is ready to listen and
                     // this thread will wait forever for a notify that already happened.
-                    needsWrite();
+                    controller.needsWrite(true);
 
                     while (flushState == FlushState.WAIT)
                     {
                         try
                         {
-                            if (logger.isDebugEnabled())
+                            if (debug)
                                 logger.debug("Flusher thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                             flushCondition.await();
-                            if (logger.isDebugEnabled())
+                            if (debug)
                                 logger.debug("Flusher thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                         }
                         catch (InterruptedException x)
                         {
-                            logger.debug("Flusher thread {} interrupted on pending write", Thread.currentThread());
-                            close();
+                            if (debug)
+                                logger.debug("Flusher thread {} interrupted on pending write", Thread.currentThread());
                             Thread.currentThread().interrupt();
                             throw new RuntimeSocketClosedException(new ClosedByInterruptException());
                         }
                     }
 
                     if (flushState == FlushState.TIMEOUT)
-                        throw new RuntimeSocketTimeoutException();
+                        throw new RuntimeSocketTimeoutException(); // TODO: must close ?
                     else if (flushState == FlushState.CLOSE)
                         throw new RuntimeSocketClosedException();
                 }

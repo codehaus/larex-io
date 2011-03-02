@@ -9,97 +9,75 @@
 </p>
 
 <p>
-    The server socket is managed by {@link com.webtide.wharf.io.ServerConnector} implementations. <br/>
-    For each new connection from a client, the following structures are created:</p>
+    The server side is managed by {@link org.codehaus.larex.io.connector.ServerConnector}s. <br/>
+    For each new connection from a remote peer, the following structures are created:</p>
 <ul>
     <li>
-        an {@link com.webtide.wharf.io.async.AsyncCoordinator}, which coordinates the activity
-        between an {@link com.webtide.wharf.io.async.AsyncServerEndpoint} and an
-        {@link com.webtide.wharf.io.async.AsyncInterpreter}
+        a {@link org.codehaus.larex.io.Coordinator}, which coordinates the activities
+        among a {@link org.codehaus.larex.io.Channel}, a {@link org.codehaus.larex.io.Connection}
+        and a {@link org.codehaus.larex.io.Reactor}
     </li>
     <li>
-        an {@link com.webtide.wharf.io.async.AsyncEndpoint}, which manages the physical I/O
+        a {@link org.codehaus.larex.io.Channel}, which manages the physical I/O
     </li>
     <li>
-        an {@link com.webtide.wharf.io.async.AsyncInterpreter}, which deserializes bytes into
-        protocol messages, calls application code, and serializes protocol messages to bytes
+        a {@link org.codehaus.larex.io.Connection}, which allows user code to be notified of bytes
+        read from the physical connection and to write bytes to the remote peer.
     </li>
 </ul>
 <p>
-    The flow of communication between the I/O system, the coordinator, the endpoint and the interpreter
-    is the following, where === is the I/O system thread, --- is the read thread and ~~~ is the write thread.
-</p>
-Single read follows this flow:
-<pre>
-    I/O System         AsyncCoordinator       AsyncServerEndpoint        AsyncInterpreter
-        ===== readReady =====>
-                                ----- readInto ---->
-                                <---- readFrom -----
-                                -------------------------------- readFrom ---->
-</pre>
-Multiple reads follow this flow:
-<pre>
-    I/O System         AsyncCoordinator       AsyncServerEndpoint        AsyncInterpreter
-        ===== readReady =====>
-                                ----- readInto ---->
-                                <---- readFrom -----
-                                -------------------------------- readFrom ----->
-                                <------------------------------ needsRead -----
-                                ----- needsRead --->
-                                                      -----+
-                                                           | updates I/O key
-                                                      <----+
-                                <-------------------
-        <------ wakeup -------
-        ===== readReady =====>
-</pre>
-Single write follows this flow:
-<pre>
-    I/O System         AsyncCoordinator       AsyncServerEndpoint        AsyncInterpreter
-                                <------------------------------- writeFrom ---
-                                ----- writeFrom --->
-</pre>
-Partial writes follow this flow:
-<pre>
-    I/O System         AsyncCoordinator       AsyncServerEndpoint        AsyncInterpreter
-                                <------------------------------- writeFrom ---
-                                ----- writeFrom --->
-                                                      -----+
-                                                           | cannot fully write
-                                                      <----+
-                                <--- needsWrite ----
-                                ---- needsWrite --->
-                                                      -----+
-                                                           | updates I/O key
-                                                      <----+
-                                <-------------------
-         <----- wakeup ------
-         ------------------->
-                                ------------------->
-                                                      -----+
-                                                           | put thread in wait
-                                                      <----+
-          ==== writeReady ===>
-                                ~~~~~~~ write ~~~~~>
-                                                      ~~~~~+
-                                                           | notify thread in wait
-                                                      <~~~~+
-</pre>
-<p>
-    Buffers are allocated for each connection by the interpreter, for read and for write.
+    The flow of communication between the reactor, the coordinator, the channel and the connection
+    is the following, where <code>===</code> is the reactor thread, <code>---</code> is the read
+    thread and <code>~~~</code> is the write thread.
 </p>
 <p>
-    The interpreter is the object that manages concurrency, normally in a way that only one thread at a time
-    can read/write from/to the buffers.<br />
-    In cases where, for example, the interpreter offers blocking read semantic to user code (like in servlets),
-    one reading thread may be put in wait, another thread may do a further physical read to fill the buffer
-    from where the first reading thread will further read after being notified.
+    Depending on the coordinator implementation, the reactor thread and the read or write threads
+    could be the same or could be different.
 </p>
-<p>
-    Writes are always blocking, and the endpoint takes care of putting the writing thread in wait in case it
-    cannot physically write to the I/O system, then it register for write interest.<br />
-    When the I/O system is ready to write, the writing thread is notified and can flush the buffer.
-</p>
+
+<h4>Reads Flow</h4>
+
+<pre>
+   Reactor                     Coordinator          Channel           Interceptor           Connection
+      | ======= read ready =======> |                  |                   |                    |
+      | <== unset read interest === |                  |                   |                    |
+
+      |                             | ----- read ----> |                   |                    | \
+      |                             | ------------------------ read -----> |                    |  > Repeated one or more times
+      |                             |                  |                   | ------ read -----> | /
+
+      |                             | ---------------------- read end ---> |                    |
+      |                             |                  |                   | ---- read end ---> |
+      | <--- set read interest ---- |                  |                   |                    |
+</pre>
+
+<h4>Writes Flow</h4>
+
+<pre>
+    Reactor                    Coordinator          Channel           Interceptor           Connection
+      |                             | <---- write --------------------------------------------- |
+      |                             | ------------------------ write ----> |                    |
+      |                             |                  | <---- write ----- |                    |
+</pre>
+
+<h4>Partial Writes Flow</h4>
+
+<pre>
+    Reactor                    Coordinator           Channel           Interceptor          Connection
+      |                             | <---- write --------------------------------------------- |
+      |                             | ------------------------ write ----> |                    |
+      |                             |                  | <---- write ----- |                    |
+      |                             | <-- set write interest ---------------------------------- |
+      | <--- set write interest --- |                  |                   |                    |
+
+      | ======= write ready ======> |                  |                   |                    |
+      | <== unset write interest == |                  |                   |                    |
+      |                             | ~~~~~~~~~~~~~~~~~~~~ write ready ~~> |                    |
+      |                                                                    | ~~ write ready ~~> |
+      |                             | <~~~~ write ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
+      |                             | ~~~~~~~~~~~~~~~~~~~~~~~~ write ~~~~> |                    |
+      |                             |                  | <~~~~ write ~~~~~ |                    |
+</pre>
 
 </body>
 </html>

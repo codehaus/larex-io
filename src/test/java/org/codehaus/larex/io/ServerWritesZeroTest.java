@@ -109,7 +109,7 @@ public class ServerWritesZeroTest extends AbstractTestCase
             {
                 Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                assertTrue(connection.awaitReady(1000));
+                assertTrue(connection.awaitOpened(1000));
                 try
                 {
                     ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));

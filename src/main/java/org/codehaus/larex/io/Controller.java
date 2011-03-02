@@ -74,7 +74,7 @@ public interface Controller
     /**
      * <p>Non-blocking writes bytes from the given {@code buffer}.</p>
      * <p>Normally, a connection will call this method after it filled the buffer with bytes
-     * to write, and this coordinator will forward the call to the {@link Channel channel}.</p>
+     * to write, and this controller will forward the call to the {@link Channel channel}.</p>
      *
      * @param buffer the buffer to write bytes from
      * @return the number of bytes written
@@ -84,10 +84,17 @@ public interface Controller
     public int write(ByteBuffer buffer) throws RuntimeSocketClosedException;
 
     /**
-     * <p>Closes the given stream type of the channel associated with this coordinator.</p>
+     * <p>Closes the given stream type of the channel associated with this controller.</p>
      *
      * @param type the stream type to close
      * @see Channel#close(StreamType)
      */
     public void close(StreamType type);
+
+    /**
+     * @param type the stream type to test for close
+     * @return whether the associated channel is closed for the given stream type
+     * @see #close(StreamType)
+     */
+    public boolean isClosed(StreamType type);
 }

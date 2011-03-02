@@ -64,7 +64,7 @@ public class ClientClosesTest extends AbstractTestCase
             {
                 Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                assertTrue(connection.awaitReady(1000));
+                assertTrue(connection.awaitOpened(1000));
 
                 // In JDK 5, closing the connection does not cause a FIN to be sent to the server,
                 // see http://bugs.sun.com/view_bug.do?bug_id=4960962.
@@ -205,7 +205,7 @@ public class ClientClosesTest extends AbstractTestCase
                     }
                 });
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                assertTrue(connection.awaitReady(1000));
+                assertTrue(connection.awaitOpened(1000));
                 try
                 {
                     // Trigger server-side read, which will write to the client
@@ -331,7 +331,7 @@ public class ClientClosesTest extends AbstractTestCase
                     }
                 });
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                assertTrue(connection.awaitReady(1000));
+                assertTrue(connection.awaitOpened(1000));
                 try
                 {
                     // Trigger server-side read, which will write to the client

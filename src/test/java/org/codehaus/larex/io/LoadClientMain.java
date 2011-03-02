@@ -122,7 +122,7 @@ public class LoadClientMain
                 Endpoint<LatencyConnection> endpoint = connector.newEndpoint(connectionFactory);
                 endpoint.setBindAddress(new InetSocketAddress("192.168.0.3", 0));
                 LatencyConnection connection = endpoint.connect(address);
-                if (connection.awaitReady(1000))
+                if (connection.awaitOpened(1000))
                     this.connections.add(connection);
                 currentConnections = this.connections.size();
             }

@@ -96,7 +96,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                 Endpoint<StandardConnection> endpoint = connector.newEndpoint(new StandardConnection.Factory());
                 endpoint.setWriteTimeout(1000);
                 StandardConnection connection = endpoint.connect(new InetSocketAddress("localhost", port));
-                assertTrue(connection.awaitReady(1000));
+                assertTrue(connection.awaitOpened(1000));
 
                 try
                 {
