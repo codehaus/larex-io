@@ -144,6 +144,7 @@ public class NonBlockingWriter
                     temporary.put(buffer);
                     temporary.put(bytes);
                     temporary.flip();
+                    releaseBuffer(buffer);
                     this.buffer = temporary;
                     controller.needsWrite(true);
                     return 0;
