@@ -49,25 +49,17 @@ public class CachedByteBuffers implements ByteBuffers
     public ByteBuffer acquire(int size, boolean direct)
     {
         int bucket = bucketFor(size);
-        ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = direct ? directBuffers : heapBuffers;
+        ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = buffersFor(direct);
 
-        // Avoid to create a new queue every time, just to be discarded immediately
+        ByteBuffer result = null;
         Queue<ByteBuffer> byteBuffers = buffers.get(bucket);
-        if (byteBuffers == null)
-        {
-            byteBuffers = new ConcurrentLinkedQueue<ByteBuffer>();
-            Queue<ByteBuffer> existing = buffers.putIfAbsent(bucket, byteBuffers);
-            if (existing != null)
-                byteBuffers = existing;
-        }
+        if (byteBuffers != null)
+            result = byteBuffers.poll();
 
-        ByteBuffer result = byteBuffers.poll();
-        while (result == null)
+        if (result == null)
         {
             int capacity = bucket * factor;
             result = direct ? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
-            byteBuffers.offer(result);
-            result = byteBuffers.poll();
         }
 
         result.clear();
@@ -79,10 +71,25 @@ public class CachedByteBuffers implements ByteBuffers
     public void release(ByteBuffer buffer)
     {
         int bucket = bucketFor(buffer.capacity());
-        ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = buffer.isDirect() ? directBuffers : heapBuffers;
+        ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = buffersFor(buffer.isDirect());
+
+        // Avoid to create a new queue every time, just to be discarded immediately
         Queue<ByteBuffer> byteBuffers = buffers.get(bucket);
-        if (byteBuffers != null)
-            byteBuffers.offer(buffer);
+        if (byteBuffers == null)
+        {
+            byteBuffers = new ConcurrentLinkedQueue<ByteBuffer>();
+            Queue<ByteBuffer> existing = buffers.putIfAbsent(bucket, byteBuffers);
+            if (existing != null)
+                byteBuffers = existing;
+        }
+
+        byteBuffers.offer(buffer);
+    }
+
+    public void clear()
+    {
+        directBuffers.clear();
+        heapBuffers.clear();
     }
 
     private int bucketFor(int size)
@@ -91,5 +98,10 @@ public class CachedByteBuffers implements ByteBuffers
         if (size % factor > 0)
             ++bucket;
         return bucket;
+    }
+
+    ConcurrentMap<Integer, Queue<ByteBuffer>> buffersFor(boolean direct)
+    {
+        return direct ? directBuffers : heapBuffers;
     }
 }
