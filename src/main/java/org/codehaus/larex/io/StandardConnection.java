@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class StandardConnection extends FlushableConnection
 {
-    private final CountDownLatch ready = new CountDownLatch(1);
+    private final CountDownLatch opened = new CountDownLatch(1);
 
     public StandardConnection(Controller controller)
     {
@@ -39,7 +39,7 @@ public class StandardConnection extends FlushableConnection
     void doOnOpen()
     {
         super.doOnOpen();
-        ready.countDown();
+        opened.countDown();
     }
 
     /**
@@ -52,7 +52,12 @@ public class StandardConnection extends FlushableConnection
      */
     public boolean awaitOpened(long timeout) throws InterruptedException
     {
-        return ready.await(timeout, TimeUnit.MILLISECONDS);
+        return opened.await(timeout, TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    protected void onRead(ByteBuffer buffer)
+    {
     }
 
     /**
