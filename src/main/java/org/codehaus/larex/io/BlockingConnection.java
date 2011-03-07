@@ -18,11 +18,14 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * <p>Implementation of {@link Connection} that provides blocking read functionality
- * and inherits flush and close functionalities.</p>
- * <p>User code must implement {@link #openEvent()}, typically in the following way:</p>
+ * <p>Implementation of {@link Connection} that provides blocking read functionality,
+ * blocking write functionalities and inherits close functionalities.</p>
+ * <p>User code must implement {@link #onOpen()}, typically in the following way:</p>
  * <pre>
  * public void onOpen()
  * {
@@ -32,23 +35,31 @@ import java.nio.channels.ClosedByInterruptException;
  *
  *     ByteBuffer writeBuffer = ByteBuffer.allocate(256);
  *     // Fill the writeBuffer with response data
- *     flush(writeBuffer);
+ *     write(writeBuffer);
  * }
  * </pre>
- *
- * @version $Revision$ $Date$
  */
-public abstract class BlockingConnection extends FlushableConnection
+public class BlockingConnection extends ClosableConnection
 {
+    private final Lock lock = new ReentrantLock();
+    private final Condition reading = lock.newCondition();
+    private final Condition buffering = lock.newCondition();
+    private final int capacity;
+    /* Guarded by #lock */
     private ByteBuffer buffer;
+    /* Guarded by #lock */
     private ReadState readState = ReadState.WAIT;
 
     public BlockingConnection(Controller controller)
     {
-        super(controller);
+        this(controller, 1024);
     }
 
-    public abstract void onOpen();
+    public BlockingConnection(Controller controller, int capacity)
+    {
+        super(controller);
+        this.capacity = capacity;
+    }
 
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
@@ -56,16 +67,58 @@ public abstract class BlockingConnection extends FlushableConnection
      * @param buffer the buffer containing the bytes read
      */
     @Override
-    public final void onRead(ByteBuffer buffer)
+    protected final void onRead(ByteBuffer buffer)
     {
+        lock.lock();
+        try
+        {
+            if (this.buffer == null)
+                this.buffer = ByteBuffer.allocate(capacity);
+
+            while (this.buffer.remaining() < buffer.remaining())
+            {
+                buffering.await();
+                // TODO: does it solve the problem ?
+                // TODO: We make this thread wait, the key is zero, but the reactor will notify us again that we need to read more ?
+                // TODO: Answer is YES
+
+                // TODO: at this point I wonder if it's not better to return something from onRead() to signal
+                // TODO: "proceed reading" or "do not set read interest".
+                // TODO: here we would just return false, and no hassles with threads in wait to be notified
+                // TODO: we would just call needsRead(true) if we need to read more
+            }
+
+            this.buffer.put(buffer);
+        }
+        finally
+        {
+            lock.unlock();
+        }
+
         // TODO: fix this: if this.buffer is small we copy, notify,
         // TODO: but this method is called again because there is more data to read
         // TODO: need to wait until it's processed, or buffer it somewhere
+        // TODO: instead of notifying here we should notify from onReadEnd()
         synchronized (this)
         {
             this.buffer.put(buffer);
             readState = ReadState.READ;
             notify();
+        }
+    }
+
+    @Override
+    protected final boolean onReadEnd()
+    {
+        lock.lock();
+        try
+        {
+            reading.signal();
+            return true;
+        }
+        finally
+        {
+            lock.unlock();
         }
     }
 
@@ -92,7 +145,7 @@ public abstract class BlockingConnection extends FlushableConnection
     protected int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
     {
         int start = buffer.position();
-        getController().setReadBufferSize(buffer.remaining());
+        getController().setReadBufferSize(buffer.remaining()); // TODO: no need for this since we do multiple reads
 
         synchronized (this)
         {
@@ -157,6 +210,11 @@ public abstract class BlockingConnection extends FlushableConnection
                 notify();
             }
         }
+    }
+
+    public int available()
+    {
+        return 0;
     }
 
     private enum ReadState
