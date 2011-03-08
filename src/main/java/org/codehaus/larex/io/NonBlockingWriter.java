@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <p>A helper class that implements non blocking writes buffering unwritten bytes to write
+ * <p>A helper class that implements non blocking writes by buffering unwritten bytes to write
  * them at the first occasion, normally when the reactor signals that the underlying connection
  * is again ready to be written.</p>
  * <p>Read ready notification usually calls user code, that may write, and these writes may
@@ -28,8 +28,7 @@ public class NonBlockingWriter
     }
 
     /**
-     * <p>Method to be invoked when the underlying connection is
-     * ready to be written.</p>
+     * <p>Method to be invoked when the underlying connection is ready to be written.</p>
      */
     public void writeReadyEvent()
     {

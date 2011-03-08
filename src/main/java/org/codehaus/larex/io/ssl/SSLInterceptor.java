@@ -524,7 +524,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
     public void onClosing(StreamType type)
     {
         if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
-            flusher.closeEvent();
+            flusher.closingEvent();
         super.onClosing(type);
     }
 

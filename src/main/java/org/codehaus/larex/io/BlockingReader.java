@@ -6,6 +6,11 @@ import java.nio.channels.ClosedByInterruptException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * <p>A helper class that implements blocking reads via {@link #read(ByteBuffer)}.</p>
+ * <p>Read events copy the read bytes into a buffer that is then copied into the
+ * buffer passed as parameter to {@link #read(ByteBuffer)}.</p>
+ */
 public class BlockingReader
 {
     private static final Logger logger = LoggerFactory.getLogger(BlockingConnection.class);
@@ -21,7 +26,16 @@ public class BlockingReader
         this.controller = controller;
     }
 
-    public boolean fill(ByteBuffer buffer)
+    /**
+     * <p>Method to be invoked when the underlying connection has read bytes.</p>
+     * <p>This method normally returns false, so that there is backpressure
+     * on reads if the user code does not perform any read.</p>
+     *
+     * @param buffer the buffer containing the bytes read
+     * @return whether to set read interest to receive further read events
+     * @see #read(ByteBuffer)
+     */
+    public boolean readEvent(ByteBuffer buffer)
     {
         synchronized (this)
         {
@@ -42,6 +56,13 @@ public class BlockingReader
         }
     }
 
+    /**
+     * <p>Method to be invoked to read data into the given buffer.</p>
+     *
+     * @param buffer the buffer to read data into
+     * @return the number of bytes read, or -1 if the remote peer has closed the connection
+     * @see #readEvent(ByteBuffer)
+     */
     public int read(ByteBuffer buffer)
     {
         synchronized (this)
@@ -99,6 +120,9 @@ public class BlockingReader
         }
     }
 
+    /**
+     * <p>Method to be invoked when the read timed out.</p>
+     */
     public void readTimeoutEvent()
     {
         synchronized (this)
@@ -109,6 +133,9 @@ public class BlockingReader
         }
     }
 
+    /**
+     * <p>Method to be invoked when the remote peer has closed the underlying connection.</p>
+     */
     public void remoteCloseEvent()
     {
         synchronized (this)
@@ -119,7 +146,10 @@ public class BlockingReader
         }
     }
 
-    public void closeEvent()
+    /**
+     * <p>Method to be invoked when the connection is about to be closed.</p>
+     */
+    public void closingEvent()
     {
         synchronized (this)
         {
@@ -129,6 +159,9 @@ public class BlockingReader
         }
     }
 
+    /**
+     * @return the number of bytes available to read without waiting
+     */
     public int available()
     {
         synchronized (this)

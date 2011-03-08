@@ -12,15 +12,14 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Unit tests for {@link BlockingConnection}
+ * Unit tests for {@link BlockingReader}
  */
-public class BlockingConnectionTest
+public class BlockingReaderTest
 {
     @Test
     public void testReadBlocksUntilReadEvent() throws Exception
     {
-        final BlockingConnection connection = new BlockingConnection(new EmptyController());
-        connection.openEvent();
+        final BlockingReader reader = new BlockingReader(new EmptyController());
 
         byte[] bytes = new byte[256];
         Arrays.fill(bytes, (byte)'x');
@@ -33,26 +32,25 @@ public class BlockingConnectionTest
             public void run()
             {
                 sleepFor(sleep);
-                connection.readEvent(data);
+                reader.readEvent(data);
             }
         }.start();
 
         ByteBuffer buffer = ByteBuffer.allocate(bytes.length);
         long begin = System.nanoTime();
-        int read = connection.read(buffer);
+        int read = reader.read(buffer);
         long end = System.nanoTime();
 
         assertEquals(buffer.capacity(), read);
         assertEquals(buffer.capacity(), buffer.position());
-        assertEquals(0, connection.available());
+        assertEquals(0, reader.available());
         assertTrue(TimeUnit.NANOSECONDS.toNanos(end - begin) >= TimeUnit.MILLISECONDS.toNanos(sleep));
     }
 
     @Test
     public void testReadBlocksUntilReadEventDifferentBufferCapacities() throws Exception
     {
-        final BlockingConnection connection = new BlockingConnection(new EmptyController());
-        connection.openEvent();
+        final BlockingReader reader = new BlockingReader(new EmptyController());
 
         byte[] bytes = new byte[256];
         Arrays.fill(bytes, (byte)'x');
@@ -65,33 +63,32 @@ public class BlockingConnectionTest
             public void run()
             {
                 sleepFor(sleep);
-                connection.readEvent(data);
+                reader.readEvent(data);
             }
         }.start();
 
         ByteBuffer buffer = ByteBuffer.allocate(bytes.length - 1);
         long begin = System.nanoTime();
-        int read = connection.read(buffer);
+        int read = reader.read(buffer);
         long end = System.nanoTime();
 
         assertEquals(buffer.capacity(), read);
         assertEquals(buffer.capacity(), buffer.position());
         int available = bytes.length - buffer.capacity();
-        assertEquals(available, connection.available());
+        assertEquals(available, reader.available());
         assertTrue(TimeUnit.NANOSECONDS.toNanos(end - begin) >= TimeUnit.MILLISECONDS.toNanos(sleep));
 
         buffer.clear();
-        read = connection.read(buffer);
+        read = reader.read(buffer);
         assertEquals(available, read);
         assertEquals(available, buffer.position());
-        assertEquals(0, connection.available());
+        assertEquals(0, reader.available());
     }
 
     @Test
     public void testReadBlocksUntilReadTimeoutEvent() throws Exception
     {
-        final BlockingConnection connection = new BlockingConnection(new EmptyController());
-        connection.openEvent();
+        final BlockingReader reader = new BlockingReader(new EmptyController());
 
         final long sleep = 500;
         new Thread()
@@ -100,7 +97,7 @@ public class BlockingConnectionTest
             public void run()
             {
                 sleepFor(sleep);
-                connection.readTimeoutEvent();
+                reader.readTimeoutEvent();
             }
         }.start();
 
@@ -108,7 +105,7 @@ public class BlockingConnectionTest
         long begin = System.nanoTime();
         try
         {
-            connection.read(buffer);
+            reader.read(buffer);
             fail();
         }
         catch (RuntimeSocketTimeoutException e)
@@ -122,8 +119,7 @@ public class BlockingConnectionTest
     @Test
     public void testReadBlocksUntilRemoteCloseEvent() throws Exception
     {
-        final BlockingConnection connection = new BlockingConnection(new EmptyController());
-        connection.openEvent();
+        final BlockingReader reader = new BlockingReader(new EmptyController());
 
         final long sleep = 500;
         new Thread()
@@ -132,13 +128,13 @@ public class BlockingConnectionTest
             public void run()
             {
                 sleepFor(sleep);
-                connection.remoteCloseEvent();
+                reader.remoteCloseEvent();
             }
         }.start();
 
         ByteBuffer buffer = ByteBuffer.allocate(256);
         long begin = System.nanoTime();
-        int read = connection.read(buffer);
+        int read = reader.read(buffer);
         long end = System.nanoTime();
 
         assertEquals(-1, read);
@@ -148,8 +144,7 @@ public class BlockingConnectionTest
     @Test
     public void testReadBlocksUntilLocalCloseEvent() throws Exception
     {
-        final BlockingConnection connection = new BlockingConnection(new EmptyController());
-        connection.openEvent();
+        final BlockingReader reader = new BlockingReader(new EmptyController());
 
         final long sleep = 500;
         new Thread()
@@ -158,7 +153,7 @@ public class BlockingConnectionTest
             public void run()
             {
                 sleepFor(sleep);
-                connection.closingEvent(StreamType.INPUT_OUTPUT);
+                reader.closingEvent();
             }
         }.start();
 
@@ -166,7 +161,7 @@ public class BlockingConnectionTest
         long begin = System.nanoTime();
         try
         {
-            connection.read(buffer);
+            reader.read(buffer);
             fail();
         }
         catch (RuntimeSocketClosedException e)
@@ -180,8 +175,7 @@ public class BlockingConnectionTest
     @Test
     public void testReadBlocksUntilInterrupted() throws Exception
     {
-        final BlockingConnection connection = new BlockingConnection(new EmptyController());
-        connection.openEvent();
+        final BlockingReader reader = new BlockingReader(new EmptyController());
 
         final Thread currentThread = Thread.currentThread();
 
@@ -200,7 +194,7 @@ public class BlockingConnectionTest
         long begin = System.nanoTime();
         try
         {
-            connection.read(buffer);
+            reader.read(buffer);
             fail();
         }
         catch (RuntimeSocketClosedException x)

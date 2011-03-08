@@ -23,7 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * <p>A helper class that implements blocking writes by suspending the writing thread
+ * until the reactor signals that the underlying connection is again ready to be written.</p>
  */
 public class BlockingWriter
 {
@@ -33,16 +34,15 @@ public class BlockingWriter
     /* Guarded by #this */
     private FlushState writeState = FlushState.WRITE;
 
-    protected BlockingWriter(Controller controller)
+    public BlockingWriter(Controller controller)
     {
         this.controller = controller;
     }
 
-    protected int write(Controller controller, ByteBuffer buffer)
-    {
-        return controller.write(buffer);
-    }
-
+    /**
+     * <p>Method to be invoked when the underlying connection is
+     * ready to be written.</p>
+     */
     public void writeReadyEvent()
     {
         synchronized (this)
@@ -52,6 +52,9 @@ public class BlockingWriter
         }
     }
 
+    /**
+     * <p>Method to be invoked when the write timed out.</p>
+     */
     public void writeTimeoutEvent()
     {
         synchronized (this)
@@ -61,7 +64,10 @@ public class BlockingWriter
         }
     }
 
-    public void closeEvent()
+    /**
+     * <p>Method to be invoked when the connection is about to be closed.</p>
+     */
+    public void closingEvent()
     {
         synchronized (this)
         {
@@ -123,6 +129,18 @@ public class BlockingWriter
                 }
             }
         }
+    }
+
+    /**
+     * <p>Writes the given buffer using the given controller.</p>
+     *
+     * @param controller the controller to write to
+     * @param buffer     the buffer to write
+     * @return the number of bytes written
+     */
+    protected int write(Controller controller, ByteBuffer buffer)
+    {
+        return controller.write(buffer);
     }
 
     private enum FlushState

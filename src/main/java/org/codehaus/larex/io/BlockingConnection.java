@@ -55,7 +55,7 @@ public class BlockingConnection extends ClosableConnection
     @Override
     protected final boolean onRead(ByteBuffer buffer)
     {
-        return reader.fill(buffer);
+        return reader.readEvent(buffer);
     }
 
     /**
@@ -105,9 +105,9 @@ public class BlockingConnection extends ClosableConnection
     {
         super.postClosing(type);
         if (type == StreamType.INPUT || type == StreamType.INPUT_OUTPUT)
-            reader.closeEvent();
+            reader.closingEvent();
         if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
-            writer.closeEvent();
+            writer.closingEvent();
     }
 
     public int available()

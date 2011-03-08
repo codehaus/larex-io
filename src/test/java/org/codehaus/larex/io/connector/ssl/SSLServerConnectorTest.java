@@ -37,6 +37,7 @@ import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.EchoConnection;
 import org.codehaus.larex.io.StreamType;
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -44,9 +45,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * @version $Revision$ $Date$
- */
+@Ignore
 public class SSLServerConnectorTest extends AbstractTestCase
 {
     private SSLServerConnector connector;
