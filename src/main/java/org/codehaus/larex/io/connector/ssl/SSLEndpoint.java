@@ -30,7 +30,6 @@ import org.codehaus.larex.io.ssl.SSLInterceptor;
 
 /**
  * TODO: handle set[Need|Want]ClientAuth (and other SSLEngine methods. maybe ?)
- * @version $Revision$ $Date$
  */
 public class SSLEndpoint<C extends Connection> extends StandardEndpoint<C>
 {

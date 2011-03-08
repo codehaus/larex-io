@@ -35,9 +35,6 @@ import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.connector.ClientConnector;
 
-/**
- * @version $Revision$ $Date$
- */
 public class SSLClientConnector extends ClientConnector
 {
     private volatile ByteBuffers sslByteBuffers;

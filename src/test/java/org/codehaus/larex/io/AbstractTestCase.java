@@ -25,9 +25,6 @@ import org.junit.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * @version $Revision$ $Date$
- */
 public abstract class AbstractTestCase
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());

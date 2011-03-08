@@ -28,9 +28,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.codehaus.larex.io.connector.ServerConnector;
 
-/**
- * @version $Revision: 13 $ $Date$
- */
 public class LoadServerMain
 {
     private static final AtomicLong selects = new AtomicLong();

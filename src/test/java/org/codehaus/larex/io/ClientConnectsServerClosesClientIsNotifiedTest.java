@@ -30,9 +30,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
 
-/**
- * @version $Revision$ $Date$
- */
 public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTestCase
 {
     @Test

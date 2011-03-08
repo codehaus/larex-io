@@ -18,8 +18,6 @@ package org.codehaus.larex.io;
 
 /**
  * <p>Enumerates the streams of a channel.</p>
- *
- * @version $Revision$ $Date$
  */
 public enum StreamType
 {

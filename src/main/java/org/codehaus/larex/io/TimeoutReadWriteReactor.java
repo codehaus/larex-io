@@ -22,9 +22,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * @version $Revision$ $Date$
- */
 public class TimeoutReadWriteReactor extends ReadWriteReactor implements Runnable
 {
     private static final AtomicInteger ids = new AtomicInteger();

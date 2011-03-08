@@ -20,8 +20,6 @@ import java.net.ConnectException;
 
 /**
  * Wraps {@link ConnectException}s thrown by the I/O Java libraries.
- *
- * @version $Revision: 13 $ $Date$
  */
 public class RuntimeSocketConnectException extends RuntimeIOException
 {

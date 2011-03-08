@@ -20,8 +20,6 @@ import java.net.SocketTimeoutException;
 
 /**
  * Wraps {@link SocketTimeoutException}s thrown by the I/O Java libraries.
- *
- * @version $Revision: 13 $ $Date$
  */
 public class RuntimeSocketTimeoutException extends RuntimeIOException
 {

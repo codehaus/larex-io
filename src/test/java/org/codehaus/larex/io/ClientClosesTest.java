@@ -31,9 +31,6 @@ import org.junit.Test;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @version $Revision$ $Date$
- */
 public class ClientClosesTest extends AbstractTestCase
 {
     @Test

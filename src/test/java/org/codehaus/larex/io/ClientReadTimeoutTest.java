@@ -27,9 +27,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;
 
-/**
- * @version $Revision$ $Date$
- */
 public class ClientReadTimeoutTest extends AbstractTestCase
 {
     @Test

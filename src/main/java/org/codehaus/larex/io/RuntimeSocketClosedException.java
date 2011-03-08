@@ -20,8 +20,6 @@ import java.nio.channels.ClosedChannelException;
 
 /**
  * Wraps {@link ClosedChannelException}s thrown by the I/O Java libraries.
- *
- * @version $Revision: 13 $ $Date$
  */
 public class RuntimeSocketClosedException extends RuntimeIOException
 {

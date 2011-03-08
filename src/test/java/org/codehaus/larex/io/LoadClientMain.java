@@ -37,9 +37,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.codehaus.larex.io.connector.ClientConnector;
 import org.codehaus.larex.io.connector.Endpoint;
 
-/**
- * @version $Revision: 13 $ $Date$
- */
 public class LoadClientMain
 {
     public static void main(String[] args) throws Exception

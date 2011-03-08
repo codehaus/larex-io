@@ -29,9 +29,6 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * @version $Revision$ $Date$
- */
 public class ClientWriteTimeoutTest extends AbstractTestCase
 {
     @Test
