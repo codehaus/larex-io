@@ -50,16 +50,9 @@ public interface Interceptor
      * before {@link Connection#readEvent(ByteBuffer)}.</p>
      *
      * @param buffer the buffer with the bytes read
-     */
-    public void onRead(ByteBuffer buffer);
-
-    /**
-     * <p>Callback method invoked when the read is completed for the
-     * time being, before {@link Connection#readEndEvent()}.</p>
-     *
      * @return whether to set read interest to receive further read events
      */
-    public boolean onReadEnd();
+    public boolean onRead(ByteBuffer buffer);
 
     /**
      * <p>Callback method invoked when the read timed out, before
@@ -150,15 +143,9 @@ public interface Interceptor
         }
 
         @Override
-        public void onRead(ByteBuffer buffer)
+        public boolean onRead(ByteBuffer buffer)
         {
-            getNext().onRead(buffer);
-        }
-
-        @Override
-        public boolean onReadEnd()
-        {
-            return getNext().onReadEnd();
+            return getNext().onRead(buffer);
         }
 
         @Override

@@ -26,12 +26,8 @@ public class AbstractConnection implements Connection
 {
     public final void openEvent()
     {
-        doOnOpen();
         onOpen();
-    }
-
-    void doOnOpen()
-    {
+        postOpen();
     }
 
     /**
@@ -41,14 +37,13 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void readEvent(ByteBuffer buffer)
+    void postOpen()
     {
-        doOnRead(buffer);
-        onRead(buffer);
     }
 
-    void doOnRead(ByteBuffer buffer)
+    public final boolean readEvent(ByteBuffer buffer)
     {
+        return onRead(buffer);
     }
 
     /**
@@ -56,46 +51,17 @@ public class AbstractConnection implements Connection
      * peer into the given {@code buffer}.</p>
      *
      * @param buffer the buffer containing the bytes read
-     * @see #onReadEnd()
-     */
-    protected void onRead(ByteBuffer buffer)
-    {
-    }
-
-    @Override
-    public final boolean readEndEvent()
-    {
-        doOnReadEnd();
-        return onReadEnd();
-    }
-
-    void doOnReadEnd()
-    {
-    }
-
-    /**
-     * <p>Callback method invoked when there is no more data to read from the
-     * time being.</p>
-     * <p>This method must return whether the framework must set read interest
-     * to receive further read events.</p>
-     * <p>By default, this method returns true.</p>
-     *
      * @return whether to set read interest
-     * @see #onRead(ByteBuffer)
      */
-    protected boolean onReadEnd()
+    protected boolean onRead(ByteBuffer buffer)
     {
         return true;
     }
 
     public final void readTimeoutEvent()
     {
-        doOnReadTimeout();
         onReadTimeout();
-    }
-
-    void doOnReadTimeout()
-    {
+        postReadTimeout();
     }
 
     /**
@@ -105,14 +71,14 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void writeEvent()
+    void postReadTimeout()
     {
-        doOnWrite();
-        onWrite();
     }
 
-    void doOnWrite()
+    public final void writeEvent()
     {
+        onWrite();
+        postWrite();
     }
 
     /**
@@ -123,14 +89,14 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void writeTimeoutEvent()
+    void postWrite()
     {
-        doOnWriteTimeout();
-        onWriteTimeout();
     }
 
-    void doOnWriteTimeout()
+    public final void writeTimeoutEvent()
     {
+        onWriteTimeout();
+        postWriteTimeout();
     }
 
     /**
@@ -140,14 +106,14 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void remoteCloseEvent()
+    void postWriteTimeout()
     {
-        doOnRemoteClose();
-        onRemoteClose();
     }
 
-    void doOnRemoteClose()
+    public final void remoteCloseEvent()
     {
+        onRemoteClose();
+        postRemoteClose();
     }
 
     /**
@@ -158,14 +124,14 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void closingEvent(StreamType type)
+    void postRemoteClose()
     {
-        doOnClosing(type);
-        onClosing(type);
     }
 
-    void doOnClosing(StreamType type)
+    public final void closingEvent(StreamType type)
     {
+        onClosing(type);
+        postClosing(type);
     }
 
     /**
@@ -178,14 +144,14 @@ public class AbstractConnection implements Connection
     {
     }
 
-    public final void closedEvent(StreamType type)
+    void postClosing(StreamType type)
     {
-        doOnClosed(type);
-        onClosed(type);
     }
 
-    void doOnClosed(StreamType type)
+    public final void closedEvent(StreamType type)
     {
+        onClosed(type);
+        postClosed(type);
     }
 
     /**
@@ -195,6 +161,10 @@ public class AbstractConnection implements Connection
      * @param type the stream type that has been closed
      */
     protected void onClosed(StreamType type)
+    {
+    }
+
+    void postClosed(StreamType type)
     {
     }
 }

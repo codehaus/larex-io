@@ -35,23 +35,23 @@ public abstract class FlushableConnection extends ClosableConnection
     }
 
     @Override
-    void doOnWrite()
+    void postWrite()
     {
-        super.doOnWrite();
+        super.postWrite();
         writer.writeReadyEvent();
     }
 
     @Override
-    void doOnWriteTimeout()
+    void postWriteTimeout()
     {
-        super.doOnWriteTimeout();
+        super.postWriteTimeout();
         writer.writeTimeoutEvent();
     }
 
     @Override
-    void doOnClosing(StreamType type)
+    void postClosing(StreamType type)
     {
-        super.doOnClosing(type);
+        super.postClosing(type);
         if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
             writer.closeEvent();
     }

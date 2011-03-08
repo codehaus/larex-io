@@ -19,7 +19,7 @@ package org.codehaus.larex.io;
 import java.nio.ByteBuffer;
 
 /**
- * @version $Revision: 903 $ $Date$
+ * <p>A connection that echoes the read bytes back to the sender.</p>
  */
 public class EchoConnection extends StandardConnection
 {
@@ -29,9 +29,10 @@ public class EchoConnection extends StandardConnection
     }
 
     @Override
-    protected void onRead(ByteBuffer buffer)
+    protected boolean onRead(ByteBuffer buffer)
     {
         flush(buffer);
+        return true;
     }
 
     public static class Factory implements ConnectionFactory<EchoConnection>

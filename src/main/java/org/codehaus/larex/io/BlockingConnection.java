@@ -18,9 +18,9 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>Implementation of {@link Connection} that provides blocking read functionality,
@@ -41,96 +41,41 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class BlockingConnection extends ClosableConnection
 {
-    private final Lock lock = new ReentrantLock();
-    private final Condition reading = lock.newCondition();
-    private final Condition buffering = lock.newCondition();
-    private final int capacity;
-    /* Guarded by #lock */
-    private ByteBuffer buffer;
-    /* Guarded by #lock */
+    private static final Logger logger = LoggerFactory.getLogger(BlockingConnection.class);
+    /* Guarded by #this */
+    private ByteBuffer store;
+    /* Guarded by #this */
     private ReadState readState = ReadState.WAIT;
 
     public BlockingConnection(Controller controller)
     {
-        this(controller, 1024);
-    }
-
-    public BlockingConnection(Controller controller, int capacity)
-    {
         super(controller);
-        this.capacity = capacity;
     }
 
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
      *
-     * @param buffer the buffer containing the bytes read
+     * @param buffer the buffer containing the bytes to read
      */
     @Override
-    protected final void onRead(ByteBuffer buffer)
+    protected final boolean onRead(ByteBuffer buffer)
     {
-        lock.lock();
-        try
+        synchronized (this)
         {
-            if (this.buffer == null)
-                this.buffer = ByteBuffer.allocate(capacity);
-
-            while (this.buffer.remaining() < buffer.remaining())
+            if (store == null)
             {
-                buffering.await();
-                // TODO: does it solve the problem ?
-                // TODO: We make this thread wait, the key is zero, but the reactor will notify us again that we need to read more ?
-                // TODO: Answer is YES
-
-                // TODO: at this point I wonder if it's not better to return something from onRead() to signal
-                // TODO: "proceed reading" or "do not set read interest".
-                // TODO: here we would just return false, and no hassles with threads in wait to be notified
-                // TODO: we would just call needsRead(true) if we need to read more
+                store = ByteBuffer.allocate(buffer.remaining());
+                store.put(buffer);
+                store.flip();
+                readState = ReadState.READ;
+                notify();
+                logger.debug("read {} bytes available, notified reader thread", store.remaining());
+                return false;
             }
-
-            this.buffer.put(buffer);
-        }
-        finally
-        {
-            lock.unlock();
-        }
-
-        // TODO: fix this: if this.buffer is small we copy, notify,
-        // TODO: but this method is called again because there is more data to read
-        // TODO: need to wait until it's processed, or buffer it somewhere
-        // TODO: instead of notifying here we should notify from onReadEnd()
-        synchronized (this)
-        {
-            this.buffer.put(buffer);
-            readState = ReadState.READ;
-            notify();
-        }
-    }
-
-    @Override
-    protected final boolean onReadEnd()
-    {
-        lock.lock();
-        try
-        {
-            reading.signal();
-            return true;
-        }
-        finally
-        {
-            lock.unlock();
-        }
-    }
-
-    /**
-     * <p>Overridden to implement the blocking read functionality.</p>
-     */
-    public final void onReadTimeout()
-    {
-        synchronized (this)
-        {
-            readState = ReadState.TIMEOUT;
-            notify();
+            else
+            {
+                throw new IllegalStateException();
+            }
         }
     }
 
@@ -139,82 +84,111 @@ public class BlockingConnection extends ClosableConnection
      *
      * @param buffer the buffer to read bytes into
      * @return -1 if the remote end has been closed, or the number of bytes that has been read
-     * @throws RuntimeSocketClosedException if this connection has been closed
+     * @throws RuntimeSocketClosedException  if this connection has been closed
      * @throws RuntimeSocketTimeoutException if the read timed out
      */
     protected int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
     {
-        int start = buffer.position();
-        getController().setReadBufferSize(buffer.remaining()); // TODO: no need for this since we do multiple reads
-
         synchronized (this)
         {
-            if (readState == ReadState.REMOTE_CLOSE)
+            if (store != null)
+            {
+                int bytes = store.remaining();
+                int space = buffer.remaining();
+                if (bytes <= space)
+                {
+                    buffer.put(store);
+                    store = null;
+                    getController().needsRead(true);
+                    logger.debug("read {} bytes", bytes);
+                    return bytes;
+                }
+                else
+                {
+                    int limit = store.limit();
+                    store.limit(store.position() + space);
+                    buffer.put(store);
+                    store.limit(limit);
+                    logger.debug("read {} bytes, {} bytes available", space, store.remaining());
+                    return space;
+                }
+            }
+
+            if (readState == ReadState.TIMEOUT)
+                throw new RuntimeSocketTimeoutException();
+            else if (readState == ReadState.CLOSE)
+                throw new RuntimeSocketClosedException();
+            else if (readState == ReadState.REMOTE_CLOSE)
                 return -1;
 
-            this.buffer = buffer;
             readState = ReadState.WAIT;
             getController().needsRead(true);
             while (readState == ReadState.WAIT)
             {
                 try
                 {
+                    logger.debug("read waiting for bytes");
                     wait();
                 }
                 catch (InterruptedException x)
                 {
+                    logger.debug("read waiting interrupted");
+                    // Apply below same semantic of ClosedByInterruptException
                     close();
                     Thread.currentThread().interrupt();
                     throw new RuntimeSocketClosedException(new ClosedByInterruptException());
                 }
             }
-
-            if (buffer.position() == start)
-            {
-                if (readState == ReadState.TIMEOUT)
-                    throw new RuntimeSocketTimeoutException();
-                else if (readState == ReadState.CLOSE)
-                    throw new RuntimeSocketClosedException();
-                else if (readState == ReadState.REMOTE_CLOSE)
-                    return -1;
-            }
+            logger.debug("read notified, state {}", readState);
+            return read(buffer);
         }
+    }
 
-        return buffer.position() - start;
+    void postReadTimeout()
+    {
+        synchronized (this)
+        {
+            readState = ReadState.TIMEOUT;
+            notify();
+            logger.debug("read timeout, notified reader thread");
+        }
     }
 
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
      */
-    void doOnRemoteClose()
+    void postRemoteClose()
     {
-        super.doOnRemoteClose();
+        super.postRemoteClose();
         synchronized (this)
         {
             readState = ReadState.REMOTE_CLOSE;
             notify();
+            logger.debug("remote close, notified reader thread");
         }
     }
 
     @Override
-    void doOnClosing(StreamType type)
+    void postClosing(StreamType type)
     {
-        // TODO: fix this: needs to handle all stream types
-
-        super.doOnClosing(type);
-        if (type == StreamType.INPUT)
+        super.postClosing(type);
+        if (type == StreamType.INPUT || type == StreamType.INPUT_OUTPUT)
         {
             synchronized (this)
             {
                 readState = ReadState.CLOSE;
                 notify();
+                logger.debug("local close, notified reader thread");
             }
         }
     }
 
     public int available()
     {
-        return 0;
+        synchronized (this)
+        {
+            return store == null ? 0 : store.remaining();
+        }
     }
 
     private enum ReadState

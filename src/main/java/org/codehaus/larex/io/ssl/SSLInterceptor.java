@@ -101,7 +101,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
     }
 
     @Override
-    public void onRead(ByteBuffer sslBuffer)
+    public boolean onRead(ByteBuffer sslBuffer)
     {
         logger.debug("Reading {}", sslBuffer);
         int bufferSize = sslEngine.getSession().getApplicationBufferSize();
@@ -152,6 +152,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
         {
             sslByteBuffers.release(buffer);
         }
+        return false;
     }
 
     private boolean decryptData(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException

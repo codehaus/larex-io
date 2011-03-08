@@ -66,9 +66,10 @@ public class StandardClientConnectorTest extends AbstractTestCase
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected void onRead(ByteBuffer buffer)
+                            protected boolean onRead(ByteBuffer buffer)
                             {
                                 responseLatch.countDown();
+                                return super.onRead(buffer);
                             }
                         };
                     }

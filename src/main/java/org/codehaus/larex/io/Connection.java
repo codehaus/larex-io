@@ -40,24 +40,11 @@ public interface Connection
      * <p>Callback method invoked when this connection has read bytes sent from the remote peer.</p>
      * <p>This method may be called multiple times, for example because the read buffer is smaller
      * than the data available.</p>
-     * <p>When the data available has been completely read for the time being, {@link #readEndEvent()}
-     * will be called.</p>
      *
      * @param buffer the buffer containing the bytes read
-     * @see #readEndEvent()
-     */
-    public void readEvent(ByteBuffer buffer);
-
-    /**
-     * <p>Callback method invoked when this connection has finished to read bytes from the remote
-     * peer.</p>
-     * <p>This method is invoked after {@link #readEvent(ByteBuffer)} when the data available has
-     * been completely read for the time being. </p>
-     *
      * @return whether to set read interest to receive further read events
-     * @see #readEvent(ByteBuffer)
      */
-    public boolean readEndEvent();
+    public boolean readEvent(ByteBuffer buffer);
 
     /**
      * <p>Callback method invoked when this connection times out while waiting to read bytes.<p>

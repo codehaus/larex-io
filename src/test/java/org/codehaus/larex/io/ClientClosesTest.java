@@ -109,9 +109,10 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(controller)
                 {
                     @Override
-                    protected void onRead(ByteBuffer buffer)
+                    protected boolean onRead(ByteBuffer buffer)
                     {
                         flush(ByteBuffer.wrap(new byte[]{1}));
+                        return super.onRead(buffer);
                     }
                 };
             }
@@ -197,9 +198,10 @@ public class ClientClosesTest extends AbstractTestCase
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected void onRead(ByteBuffer buffer)
+                            protected boolean onRead(ByteBuffer buffer)
                             {
                                 read.set(true);
+                                return super.onRead(buffer);
                             }
                         };
                     }
@@ -254,9 +256,10 @@ public class ClientClosesTest extends AbstractTestCase
                 return new StandardConnection(controller)
                 {
                     @Override
-                    protected void onRead(ByteBuffer buffer)
+                    protected boolean onRead(ByteBuffer buffer)
                     {
                         flush(ByteBuffer.wrap(new byte[]{1}));
+                        return super.onRead(buffer);
                     }
 
                     @Override
@@ -315,10 +318,11 @@ public class ClientClosesTest extends AbstractTestCase
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected void onRead(ByteBuffer buffer)
+                            protected boolean onRead(ByteBuffer buffer)
                             {
                                 ClientClosesTest.this.logger.debug("Step 3 releasing");
                                 latch3.countDown();
+                                return super.onRead(buffer);
                             }
 
                             @Override

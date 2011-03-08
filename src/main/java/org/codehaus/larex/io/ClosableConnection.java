@@ -55,9 +55,9 @@ public abstract class ClosableConnection extends AbstractConnection
     }
 
     @Override
-    void doOnClosed(StreamType type)
+    void postClosed(StreamType type)
     {
-        super.doOnClosed(type);
+        super.postClosed(type);
         if (type == StreamType.INPUT_OUTPUT)
         {
             CountDownLatch softClose = this.softClose;

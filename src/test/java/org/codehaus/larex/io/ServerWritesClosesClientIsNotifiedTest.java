@@ -72,10 +72,11 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
                         return new StandardConnection(controller)
                         {
                             @Override
-                            protected void onRead(ByteBuffer buffer)
+                            protected boolean onRead(ByteBuffer buffer)
                             {
                                 if (!tester.compareAndSet(0, 1))
                                     failure.set(1);
+                                return super.onRead(buffer);
                             }
 
                             @Override

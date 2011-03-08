@@ -36,9 +36,10 @@ public class StandardConnection extends FlushableConnection
     }
 
     @Override
-    void doOnOpen()
+    void postOpen()
     {
-        super.doOnOpen();
+        super.postOpen();
+        getController().needsRead(true);
         opened.countDown();
     }
 
@@ -53,11 +54,6 @@ public class StandardConnection extends FlushableConnection
     public boolean awaitOpened(long timeout) throws InterruptedException
     {
         return opened.await(timeout, TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    protected void onRead(ByteBuffer buffer)
-    {
     }
 
     /**

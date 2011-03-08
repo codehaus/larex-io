@@ -234,10 +234,11 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(controller)
                     {
                         @Override
-                        public void onRead(ByteBuffer buffer)
+                        public boolean onRead(ByteBuffer buffer)
                         {
                             assertEquals(serverMessage, Charset.forName("UTF-8").decode(buffer).toString());
                             readLatch.countDown();
+                            return super.onRead(buffer);
                         }
 
                         @Override
@@ -402,11 +403,12 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(controller)
                     {
                         @Override
-                        protected void onRead(ByteBuffer buffer)
+                        protected boolean onRead(ByteBuffer buffer)
                         {
                             bytesCount.addAndGet(buffer.remaining());
                             if (bytesCount.get() == content.length())
                                 clientLatch.countDown();
+                            return super.onRead(buffer);
                         }
                     };
                 }
@@ -463,11 +465,12 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(controller)
                     {
                         @Override
-                        protected void onRead(ByteBuffer buffer)
+                        protected boolean onRead(ByteBuffer buffer)
                         {
                             String response = Charset.forName("UTF-8").decode(buffer).toString();
                             if (Pattern.compile("<html>", Pattern.CASE_INSENSITIVE).matcher(response).find())
                                 latch.countDown();
+                            return super.onRead(buffer);
                         }
                     };
                 }
@@ -556,13 +559,14 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     return new StandardConnection(controller)
                     {
                         @Override
-                        protected void onRead(ByteBuffer buffer)
+                        protected boolean onRead(ByteBuffer buffer)
                         {
                             if (readLatch.getCount() == 1)
                             {
                                 message.set(ByteBuffer.allocate(buffer.remaining()).put(buffer));
                                 readLatch.countDown();
                             }
+                            return super.onRead(buffer);
                         }
 
                         @Override
