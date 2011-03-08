@@ -74,7 +74,7 @@ public class ClientConnectsServerClosesClientIsNotifiedTest extends AbstractTest
                             {
                                 serverConnectionLatch.await(1, TimeUnit.SECONDS);
                                 StandardConnection connection = serverConnection.get();
-                                connection.flush(ByteBuffer.wrap(new byte[]{1}));
+                                connection.write(ByteBuffer.wrap(new byte[]{1}));
                                 connection.close();
                                 Thread.sleep(500);
                                 super.register(channel, listener);

@@ -464,7 +464,7 @@ public class LoadClientMain
 
             buffer.flip();
 
-            flush(buffer);
+            write(buffer);
 
             if (isControlMessage(type))
                 latch.await();

@@ -31,7 +31,7 @@ public class EchoConnection extends StandardConnection
     @Override
     protected boolean onRead(ByteBuffer buffer)
     {
-        flush(buffer);
+        write(buffer);
         return true;
     }
 

@@ -102,7 +102,7 @@ public class ServerReadsZeroTest extends AbstractTestCase
                 try
                 {
                     ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
-                    connection.flush(buffer);
+                    connection.write(buffer);
                     assertTrue(reads.await(1000, TimeUnit.MILLISECONDS));
 
                     // Five needsRead calls: at beginning to enable the reads, then to disable;

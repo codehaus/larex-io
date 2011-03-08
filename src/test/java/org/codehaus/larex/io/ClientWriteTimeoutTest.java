@@ -102,7 +102,7 @@ public class ClientWriteTimeoutTest extends AbstractTestCase
                 {
                     try
                     {
-                        connection.flush(ByteBuffer.wrap(new byte[]{1, 2}));
+                        connection.write(ByteBuffer.wrap(new byte[]{1, 2}));
                         fail();
                     }
                     catch (RuntimeSocketTimeoutException x)

@@ -18,9 +18,6 @@ package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,11 +28,10 @@ import org.slf4j.LoggerFactory;
 public class BlockingWriter
 {
     private static final Logger logger = LoggerFactory.getLogger(BlockingWriter.class);
-    private final Lock flushLock = new ReentrantLock();
-    private final Condition flushCondition = flushLock.newCondition();
+
     private final Controller controller;
-    /* Guarded by #flushLock */
-    private FlushState flushState = FlushState.WRITE;
+    /* Guarded by #this */
+    private FlushState writeState = FlushState.WRITE;
 
     protected BlockingWriter(Controller controller)
     {
@@ -49,47 +45,32 @@ public class BlockingWriter
 
     public void writeReadyEvent()
     {
-        flushLock.lock();
-        try
+        synchronized (this)
         {
-            flushState = FlushState.WRITE;
-            flushCondition.signal();
-        }
-        finally
-        {
-            flushLock.unlock();
+            writeState = FlushState.WRITE;
+            notify();
         }
     }
 
     public void writeTimeoutEvent()
     {
-        flushLock.lock();
-        try
+        synchronized (this)
         {
-            flushState = FlushState.TIMEOUT;
-            flushCondition.signal();
-        }
-        finally
-        {
-            flushLock.unlock();
+            writeState = FlushState.TIMEOUT;
+            notify();
         }
     }
 
     public void closeEvent()
     {
-        flushLock.lock();
-        try
+        synchronized (this)
         {
-            flushState = FlushState.CLOSE;
-            flushCondition.signal();
-        }
-        finally
-        {
-            flushLock.unlock();
+            writeState = FlushState.CLOSE;
+            notify();
         }
     }
 
-    public void flush(ByteBuffer buffer)
+    public void write(ByteBuffer buffer)
     {
         final boolean debug = logger.isDebugEnabled();
 
@@ -102,26 +83,25 @@ public class BlockingWriter
             if (buffer.hasRemaining())
             {
                 // We could not write everything, suspend the writer thread until we are write ready
-                flushLock.lock();
-                try
+                synchronized (this)
                 {
-                    if (flushState == FlushState.CLOSE)
+                    if (writeState == FlushState.CLOSE)
                         throw new RuntimeSocketClosedException();
 
-                    flushState = FlushState.WAIT;
+                    writeState = FlushState.WAIT;
 
                     // We must issue the needsWrite() below within the sync block, otherwise
                     // another thread can issue a notify that no one is ready to listen and
                     // this thread will wait forever for a notify that already happened.
                     controller.needsWrite(true);
 
-                    while (flushState == FlushState.WAIT)
+                    while (writeState == FlushState.WAIT)
                     {
                         try
                         {
                             if (debug)
                                 logger.debug("Flusher thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
-                            flushCondition.await();
+                            wait();
                             if (debug)
                                 logger.debug("Flusher thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                         }
@@ -129,19 +109,17 @@ public class BlockingWriter
                         {
                             if (debug)
                                 logger.debug("Flusher thread {} interrupted on pending write", Thread.currentThread());
+                            // Apply below same semantic of ClosedByInterruptException
+                            controller.close(StreamType.INPUT_OUTPUT);
                             Thread.currentThread().interrupt();
                             throw new RuntimeSocketClosedException(new ClosedByInterruptException());
                         }
                     }
 
-                    if (flushState == FlushState.TIMEOUT)
+                    if (writeState == FlushState.TIMEOUT)
                         throw new RuntimeSocketTimeoutException(); // TODO: must close ?
-                    else if (flushState == FlushState.CLOSE)
+                    else if (writeState == FlushState.CLOSE)
                         throw new RuntimeSocketClosedException();
-                }
-                finally
-                {
-                    flushLock.unlock();
                 }
             }
         }

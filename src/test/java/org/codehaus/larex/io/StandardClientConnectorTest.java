@@ -80,7 +80,7 @@ public class StandardClientConnectorTest extends AbstractTestCase
                 try
                 {
                     assertTrue(acceptLatch.await(1000, TimeUnit.MILLISECONDS));
-                    connection.flush(ByteBuffer.wrap(new byte[]{1}));
+                    connection.write(ByteBuffer.wrap(new byte[]{1}));
                     assertTrue(responseLatch.await(1000, TimeUnit.MILLISECONDS));
                 }
                 finally

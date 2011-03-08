@@ -503,7 +503,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
     private void flush(ByteBuffer sslBuffer)
     {
-        flusher.flush(sslBuffer);
+        flusher.write(sslBuffer);
     }
 
     @Override

@@ -113,7 +113,7 @@ public class ServerWritesZeroTest extends AbstractTestCase
                 try
                 {
                     ByteBuffer buffer = ByteBuffer.wrap("HELLO".getBytes("UTF-8"));
-                    connection.flush(buffer);
+                    connection.write(buffer);
 
                     assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
 

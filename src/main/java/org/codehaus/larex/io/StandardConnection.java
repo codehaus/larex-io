@@ -21,18 +21,20 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * <p>Concrete implementation of {@link Connection} that inherits close and
- * blocking flush functionalities.</p>
+ * <p>Concrete implementation of {@link Connection} that provides non-blocking read functionality,
+ * non-blocking write functionality and inherits close functionalities.</p>
  * <p>User code normally extends this class to provide its own logic in
  * {@link #onRead(ByteBuffer)} which, in this class, does nothing.</p>
  */
-public class StandardConnection extends FlushableConnection
+public class StandardConnection extends ClosableConnection
 {
     private final CountDownLatch opened = new CountDownLatch(1);
+    private final NonBlockingWriter writer;
 
     public StandardConnection(Controller controller)
     {
         super(controller);
+        this.writer = new NonBlockingWriter(controller);
     }
 
     @Override
@@ -41,6 +43,28 @@ public class StandardConnection extends FlushableConnection
         super.postOpen();
         getController().needsRead(true);
         opened.countDown();
+    }
+
+    @Override
+    void postWrite()
+    {
+        super.postWrite();
+        writer.writeReadyEvent();
+    }
+
+    @Override
+    void postWriteTimeout()
+    {
+        super.postWriteTimeout();
+        writer.writeTimeoutEvent();
+    }
+
+    @Override
+    void postClosing(StreamType type)
+    {
+        super.postClosing(type);
+        if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
+            writer.closingEvent();
     }
 
     /**
@@ -54,6 +78,21 @@ public class StandardConnection extends FlushableConnection
     public boolean awaitOpened(long timeout) throws InterruptedException
     {
         return opened.await(timeout, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * <p>Writes the bytes in the given buffer with non-blocking semantic.</p>
+     * <p>The given buffer will be fully consumed, either because it has been
+     * fully written or because the remaining bytes have been copied into a
+     * temporary buffer to be written later; the buffer is therefore disposable
+     * upon return from this method.</p>
+     *
+     * @param buffer the buffer to write
+     * @return the number of bytes of the given buffer that have been written
+     */
+    public final int write(ByteBuffer buffer)
+    {
+        return writer.write(buffer);
     }
 
     /**

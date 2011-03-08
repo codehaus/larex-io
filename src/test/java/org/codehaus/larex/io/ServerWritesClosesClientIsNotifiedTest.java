@@ -45,7 +45,7 @@ public class ServerWritesClosesClientIsNotifiedTest extends AbstractTestCase
                     @Override
                     public void onOpen()
                     {
-                        flush(ByteBuffer.wrap(new byte[]{1}));
+                        write(ByteBuffer.wrap(new byte[]{1}));
                         close();
                     }
                 };

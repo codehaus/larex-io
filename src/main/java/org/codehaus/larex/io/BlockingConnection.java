@@ -17,10 +17,6 @@
 package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * <p>Implementation of {@link Connection} that provides blocking read functionality,
@@ -41,15 +37,14 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockingConnection extends ClosableConnection
 {
-    private static final Logger logger = LoggerFactory.getLogger(BlockingConnection.class);
-    /* Guarded by #this */
-    private ByteBuffer store;
-    /* Guarded by #this */
-    private ReadState readState = ReadState.WAIT;
+    private final BlockingReader reader;
+    private final BlockingWriter writer;
 
     public BlockingConnection(Controller controller)
     {
         super(controller);
+        this.reader = new BlockingReader(controller);
+        this.writer = new BlockingWriter(controller);
     }
 
     /**
@@ -60,23 +55,7 @@ public class BlockingConnection extends ClosableConnection
     @Override
     protected final boolean onRead(ByteBuffer buffer)
     {
-        synchronized (this)
-        {
-            if (store == null)
-            {
-                store = ByteBuffer.allocate(buffer.remaining());
-                store.put(buffer);
-                store.flip();
-                readState = ReadState.READ;
-                notify();
-                logger.debug("read {} bytes available, notified reader thread", store.remaining());
-                return false;
-            }
-            else
-            {
-                throw new IllegalStateException();
-            }
-        }
+        return reader.fill(buffer);
     }
 
     /**
@@ -89,69 +68,27 @@ public class BlockingConnection extends ClosableConnection
      */
     protected int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
     {
-        synchronized (this)
-        {
-            if (store != null)
-            {
-                int bytes = store.remaining();
-                int space = buffer.remaining();
-                if (bytes <= space)
-                {
-                    buffer.put(store);
-                    store = null;
-                    getController().needsRead(true);
-                    logger.debug("read {} bytes", bytes);
-                    return bytes;
-                }
-                else
-                {
-                    int limit = store.limit();
-                    store.limit(store.position() + space);
-                    buffer.put(store);
-                    store.limit(limit);
-                    logger.debug("read {} bytes, {} bytes available", space, store.remaining());
-                    return space;
-                }
-            }
+        return reader.read(buffer);
+    }
 
-            if (readState == ReadState.TIMEOUT)
-                throw new RuntimeSocketTimeoutException();
-            else if (readState == ReadState.CLOSE)
-                throw new RuntimeSocketClosedException();
-            else if (readState == ReadState.REMOTE_CLOSE)
-                return -1;
-
-            readState = ReadState.WAIT;
-            getController().needsRead(true);
-            while (readState == ReadState.WAIT)
-            {
-                try
-                {
-                    logger.debug("read waiting for bytes");
-                    wait();
-                }
-                catch (InterruptedException x)
-                {
-                    logger.debug("read waiting interrupted");
-                    // Apply below same semantic of ClosedByInterruptException
-                    close();
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeSocketClosedException(new ClosedByInterruptException());
-                }
-            }
-            logger.debug("read notified, state {}", readState);
-            return read(buffer);
-        }
+    @Override
+    void postWrite()
+    {
+        super.postWrite();
+        writer.writeReadyEvent();
     }
 
     void postReadTimeout()
     {
-        synchronized (this)
-        {
-            readState = ReadState.TIMEOUT;
-            notify();
-            logger.debug("read timeout, notified reader thread");
-        }
+        super.postReadTimeout();
+        reader.readTimeoutEvent();
+    }
+
+    @Override
+    void postWriteTimeout()
+    {
+        super.postWriteTimeout();
+        writer.writeTimeoutEvent();
     }
 
     /**
@@ -160,12 +97,7 @@ public class BlockingConnection extends ClosableConnection
     void postRemoteClose()
     {
         super.postRemoteClose();
-        synchronized (this)
-        {
-            readState = ReadState.REMOTE_CLOSE;
-            notify();
-            logger.debug("remote close, notified reader thread");
-        }
+        reader.remoteCloseEvent();
     }
 
     @Override
@@ -173,26 +105,27 @@ public class BlockingConnection extends ClosableConnection
     {
         super.postClosing(type);
         if (type == StreamType.INPUT || type == StreamType.INPUT_OUTPUT)
-        {
-            synchronized (this)
-            {
-                readState = ReadState.CLOSE;
-                notify();
-                logger.debug("local close, notified reader thread");
-            }
-        }
+            reader.closeEvent();
+        if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
+            writer.closeEvent();
     }
 
     public int available()
     {
-        synchronized (this)
-        {
-            return store == null ? 0 : store.remaining();
-        }
+        return reader.available();
     }
 
-    private enum ReadState
+    /**
+     * <p>Blocking-writes the bytes contained in the given buffer.</p>
+     * <p>This call is blocking and will only return when all the bytes have been written,
+     * the write timeout expires, or the connection is closed.</p>
+     *
+     * @param buffer the buffer to write
+     * @throws RuntimeSocketTimeoutException if the write timeout expires
+     * @throws RuntimeSocketClosedException  if the connection is closed
+     */
+    public final void write(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
     {
-        READ, WAIT, TIMEOUT, REMOTE_CLOSE, CLOSE
+        writer.write(buffer);
     }
 }

@@ -326,7 +326,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
 
             assertTrue(connection.awaitOpened(1000));
 
-            connection.flush(ByteBuffer.wrap(clientMessage.getBytes("UTF-8")));
+            connection.write(ByteBuffer.wrap(clientMessage.getBytes("UTF-8")));
             assertTrue(serverLatch.await(1000, TimeUnit.MILLISECONDS));
 
             connection.close();
@@ -419,7 +419,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
 
             assertTrue(connection.awaitOpened(1000));
 
-            connection.flush(ByteBuffer.wrap(content.toString().getBytes("UTF-8")));
+            connection.write(ByteBuffer.wrap(content.toString().getBytes("UTF-8")));
 
             // It takes a while for the server to read and echo back
             assertTrue(serverLatch.await(2000, TimeUnit.MILLISECONDS));
@@ -483,7 +483,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
                     "Host: mail.google.com:443\r\n" +
                     "\r\n";
 
-            connection.flush(Charset.forName("UTF-8").encode(request));
+            connection.write(Charset.forName("UTF-8").encode(request));
             assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
         }
         finally
@@ -580,7 +580,7 @@ public class SSLClientConnectorTest extends AbstractTestCase
             StandardConnection connection = sslEndpoint.connect(new InetSocketAddress("localhost", sslServerSocket.getLocalPort()));
             assertTrue(connection.awaitOpened(1000));
 
-            connection.flush(Charset.forName("UTF-8").encode(clientMessage));
+            connection.write(Charset.forName("UTF-8").encode(clientMessage));
 
             assertTrue(readLatch.await(1000, TimeUnit.MILLISECONDS));
             assertNotNull(message.get());

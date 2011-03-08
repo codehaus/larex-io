@@ -111,7 +111,7 @@ public class ClientClosesTest extends AbstractTestCase
                     @Override
                     protected boolean onRead(ByteBuffer buffer)
                     {
-                        flush(ByteBuffer.wrap(new byte[]{1}));
+                        write(ByteBuffer.wrap(new byte[]{1}));
                         return super.onRead(buffer);
                     }
                 };
@@ -211,7 +211,7 @@ public class ClientClosesTest extends AbstractTestCase
                 try
                 {
                     // Trigger server-side read, which will write to the client
-                    connection.flush(ByteBuffer.wrap(new byte[]{1}));
+                    connection.write(ByteBuffer.wrap(new byte[]{1}));
 
                     // Wait until the client is ready to read from server
                     if (await(latch1, 1000))
@@ -258,7 +258,7 @@ public class ClientClosesTest extends AbstractTestCase
                     @Override
                     protected boolean onRead(ByteBuffer buffer)
                     {
-                        flush(ByteBuffer.wrap(new byte[]{1}));
+                        write(ByteBuffer.wrap(new byte[]{1}));
                         return super.onRead(buffer);
                     }
 
@@ -339,7 +339,7 @@ public class ClientClosesTest extends AbstractTestCase
                 try
                 {
                     // Trigger server-side read, which will write to the client
-                    connection.flush(ByteBuffer.wrap(new byte[]{1}));
+                    connection.write(ByteBuffer.wrap(new byte[]{1}));
 
                     // Wait until the client is ready to read from server
                     if (await(latch1, 1000))
