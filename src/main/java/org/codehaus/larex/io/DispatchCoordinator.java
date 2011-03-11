@@ -110,7 +110,14 @@ public class DispatchCoordinator extends TimeoutCoordinator
         @Override
         public void run()
         {
-            processOnRead();
+            try
+            {
+                processOnRead();
+            }
+            catch (Exception x)
+            {
+                logger.debug("Could not process read", x);
+            }
         }
     }
 
