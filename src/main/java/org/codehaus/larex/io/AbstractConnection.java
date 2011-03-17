@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
  * <p>Partial implementation of {@link Connection} that defines
  * an API that subclasses override to implement specific behavior.</p>
  */
-public class AbstractConnection implements Connection
+public abstract class AbstractConnection implements Connection
 {
     public final void openEvent()
     {

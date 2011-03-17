@@ -66,7 +66,7 @@ public class BlockingConnection extends ClosableConnection
      * @throws RuntimeSocketClosedException  if this connection has been closed
      * @throws RuntimeSocketTimeoutException if the read timed out
      */
-    protected int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
+    public int read(ByteBuffer buffer) throws RuntimeSocketClosedException, RuntimeSocketTimeoutException
     {
         return reader.read(buffer);
     }
