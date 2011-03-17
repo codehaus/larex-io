@@ -216,6 +216,8 @@ public class BlockingReaderTest
         catch (RuntimeSocketClosedException x)
         {
             assertTrue(x.getCause() instanceof ClosedByInterruptException);
+            // Must clear the interrupt status or other tests will fail
+            assertTrue(Thread.interrupted());
         }
         long end = System.nanoTime();
 

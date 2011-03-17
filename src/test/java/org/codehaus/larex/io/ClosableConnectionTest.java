@@ -92,4 +92,47 @@ public class ClosableConnectionTest
         long end = System.nanoTime();
         assertTrue(TimeUnit.NANOSECONDS.toMillis(end - start) >= timeout);
     }
+
+    @Test
+    public void testSoftCloseInterrupted() throws Exception
+    {
+        ClosableConnection connection = new ClosableConnection(new EmptyController())
+        {
+        };
+
+        long timeout = 1000;
+        final long sleep = timeout / 2;
+
+        final Thread currentThread = Thread.currentThread();
+        new Thread()
+        {
+            @Override
+            public void run()
+            {
+                sleepFor(sleep);
+                currentThread.interrupt();
+            }
+        }.start();
+
+        long start = System.nanoTime();
+        assertFalse(connection.softClose(timeout));
+        long end = System.nanoTime();
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(end - start) >= sleep);
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(end - start) < timeout);
+        // Must clear the interrupt status or other tests will fail
+        assertTrue(Thread.interrupted());
+    }
+
+    private void sleepFor(long time)
+    {
+        try
+        {
+            TimeUnit.MILLISECONDS.sleep(time);
+        }
+        catch (InterruptedException x)
+        {
+            Thread.currentThread().interrupt();
+            throw new RuntimeSocketTimeoutException(x);
+        }
+    }
 }
