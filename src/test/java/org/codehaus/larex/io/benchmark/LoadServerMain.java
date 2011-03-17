@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io;
+package org.codehaus.larex.io.benchmark;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -26,6 +26,15 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.codehaus.larex.io.CallerBlocksPolicy;
+import org.codehaus.larex.io.Channel;
+import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Controller;
+import org.codehaus.larex.io.EchoConnection;
+import org.codehaus.larex.io.Interceptor;
+import org.codehaus.larex.io.Reactor;
+import org.codehaus.larex.io.StandardChannel;
+import org.codehaus.larex.io.TimeoutReadWriteReactor;
 import org.codehaus.larex.io.connector.ServerConnector;
 
 public class LoadServerMain

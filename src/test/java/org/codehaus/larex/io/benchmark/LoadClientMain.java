@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.codehaus.larex.io;
+package org.codehaus.larex.io.benchmark;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -34,6 +34,10 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.codehaus.larex.io.CallerBlocksPolicy;
+import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Controller;
+import org.codehaus.larex.io.StandardConnection;
 import org.codehaus.larex.io.connector.ClientConnector;
 import org.codehaus.larex.io.connector.Endpoint;
 
