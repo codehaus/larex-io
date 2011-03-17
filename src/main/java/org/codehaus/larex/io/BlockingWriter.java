@@ -32,7 +32,7 @@ public class BlockingWriter
 
     private final Controller controller;
     /* Guarded by #this */
-    private FlushState writeState = FlushState.WRITE;
+    private WriteState writeState = WriteState.WRITE;
 
     public BlockingWriter(Controller controller)
     {
@@ -47,7 +47,7 @@ public class BlockingWriter
     {
         synchronized (this)
         {
-            writeState = FlushState.WRITE;
+            writeState = WriteState.WRITE;
             notify();
         }
     }
@@ -59,7 +59,7 @@ public class BlockingWriter
     {
         synchronized (this)
         {
-            writeState = FlushState.TIMEOUT;
+            writeState = WriteState.TIMEOUT;
             notify();
         }
     }
@@ -71,7 +71,7 @@ public class BlockingWriter
     {
         synchronized (this)
         {
-            writeState = FlushState.CLOSE;
+            writeState = WriteState.CLOSE;
             notify();
         }
     }
@@ -91,30 +91,30 @@ public class BlockingWriter
                 // We could not write everything, suspend the writer thread until we are write ready
                 synchronized (this)
                 {
-                    if (writeState == FlushState.CLOSE)
+                    if (writeState == WriteState.CLOSE)
                         throw new RuntimeSocketClosedException();
 
-                    writeState = FlushState.WAIT;
+                    writeState = WriteState.WAIT;
 
                     // We must issue the needsWrite() below within the sync block, otherwise
                     // another thread can issue a notify that no one is ready to listen and
                     // this thread will wait forever for a notify that already happened.
                     controller.needsWrite(true);
 
-                    while (writeState == FlushState.WAIT)
+                    while (writeState == WriteState.WAIT)
                     {
                         try
                         {
                             if (debug)
-                                logger.debug("Flusher thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
+                                logger.debug("Writer thread {} suspended on partial write, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                             wait();
                             if (debug)
-                                logger.debug("Flusher thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
+                                logger.debug("Writer thread {} resumed, {} bytes remaining", Thread.currentThread(), buffer.remaining());
                         }
                         catch (InterruptedException x)
                         {
                             if (debug)
-                                logger.debug("Flusher thread {} interrupted on pending write", Thread.currentThread());
+                                logger.debug("Writer thread {} interrupted on pending write", Thread.currentThread());
                             // Apply below same semantic of ClosedByInterruptException
                             controller.close(StreamType.INPUT_OUTPUT);
                             Thread.currentThread().interrupt();
@@ -122,9 +122,9 @@ public class BlockingWriter
                         }
                     }
 
-                    if (writeState == FlushState.TIMEOUT)
+                    if (writeState == WriteState.TIMEOUT)
                         throw new RuntimeSocketTimeoutException(); // TODO: must close ?
-                    else if (writeState == FlushState.CLOSE)
+                    else if (writeState == WriteState.CLOSE)
                         throw new RuntimeSocketClosedException();
                 }
             }
@@ -143,7 +143,7 @@ public class BlockingWriter
         return controller.write(buffer);
     }
 
-    private enum FlushState
+    private enum WriteState
     {
         WRITE, WAIT, TIMEOUT, CLOSE
     }
