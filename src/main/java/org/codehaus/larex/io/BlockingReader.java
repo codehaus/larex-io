@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockingReader
 {
-    private static final Logger logger = LoggerFactory.getLogger(BlockingConnection.class);
+    private static final Logger logger = LoggerFactory.getLogger(BlockingReader.class);
 
     private final Controller controller;
     /* Guarded by #this */
@@ -48,7 +48,7 @@ public class BlockingReader
      * on reads if the user code does not perform any read.</p>
      *
      * @param buffer the buffer containing the bytes read
-     * @return whether to set read interest to receive further read events
+     * @return whether to receive further read events
      * @see #read(ByteBuffer)
      */
     public boolean readEvent(ByteBuffer buffer)

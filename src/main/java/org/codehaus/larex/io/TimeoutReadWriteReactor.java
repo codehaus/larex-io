@@ -52,7 +52,7 @@ public class TimeoutReadWriteReactor extends ReadWriteReactor implements Runnabl
 
     protected Thread newTimerThread(Runnable timer)
     {
-        Thread thread = new Thread(timer, getClass().getSimpleName() + "-" + ids.incrementAndGet());
+        Thread thread = new Thread(timer, Reactor.class.getSimpleName() + "-Timeout-" + ids.incrementAndGet());
         thread.setDaemon(true);
         return thread;
     }
@@ -90,7 +90,7 @@ public class TimeoutReadWriteReactor extends ReadWriteReactor implements Runnabl
 
     public void run()
     {
-        logger.debug("Timer loop entered, period {} ms", getTimerPeriod());
+        logger.debug("Timeout loop entered, period {} ms", getTimerPeriod());
         try
         {
             while (active)
@@ -99,7 +99,7 @@ public class TimeoutReadWriteReactor extends ReadWriteReactor implements Runnabl
 
                 Set<Coordinator> coordinators = this.coordinators.keySet();
                 if (logger.isDebugEnabled())
-                    logger.debug("Timer checking {} connections", coordinators.size());
+                    logger.debug("Timeout check for {} connections", coordinators.size());
                 for (Coordinator coordinator : coordinators)
                 {
                     coordinator.timeoutRead();
@@ -113,7 +113,7 @@ public class TimeoutReadWriteReactor extends ReadWriteReactor implements Runnabl
         }
         finally
         {
-            logger.debug("Timer loop exited");
+            logger.debug("Timeout loop exited");
         }
     }
 }

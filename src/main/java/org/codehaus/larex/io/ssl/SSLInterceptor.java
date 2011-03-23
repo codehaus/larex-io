@@ -142,6 +142,7 @@ public class SSLInterceptor extends Interceptor.Forwarder
 
             return decryptData(sslBuffer, buffer);
 */
+            return true;
         }
         catch (SSLException x)
         {
@@ -152,7 +153,6 @@ public class SSLInterceptor extends Interceptor.Forwarder
         {
             sslByteBuffers.release(buffer);
         }
-        return false;
     }
 
     private boolean decryptData(ByteBuffer sslBuffer, ByteBuffer buffer) throws SSLException

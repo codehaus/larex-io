@@ -50,7 +50,7 @@ public interface Interceptor
      * before {@link Connection#readEvent(ByteBuffer)}.</p>
      *
      * @param buffer the buffer with the bytes read
-     * @return whether to set read interest to receive further read events
+     * @return whether to receive further read events
      */
     public boolean onRead(ByteBuffer buffer);
 

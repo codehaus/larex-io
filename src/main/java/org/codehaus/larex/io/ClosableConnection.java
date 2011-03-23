@@ -55,7 +55,7 @@ public abstract class ClosableConnection extends AbstractConnection
     }
 
     @Override
-    void postClosed(StreamType type)
+    protected void postClosed(StreamType type)
     {
         super.postClosed(type);
         if (type == StreamType.INPUT_OUTPUT)
@@ -71,17 +71,17 @@ public abstract class ClosableConnection extends AbstractConnection
      *
      * @param type the stream type to close
      */
-    public final void close(StreamType type)
+    public void close(StreamType type)
     {
         getController().close(type);
     }
 
     /**
-     * <p>Hard closes this connection.</p>
+     * <p>Hard closes this connection, equivalent to {@link #close(StreamType) close(StreamType.INPUT_OUTPUT)}.</p>
      *
      * @see #softClose(long)
      */
-    public final void close()
+    public void close()
     {
         close(StreamType.INPUT_OUTPUT);
     }
@@ -96,7 +96,7 @@ public abstract class ClosableConnection extends AbstractConnection
      * @return true if the connection was soft closed, false if it was hard closed
      * @see #close()
      */
-    public final boolean softClose(long timeout)
+    public boolean softClose(long timeout)
     {
         CountDownLatch softClose = new CountDownLatch(1);
         this.softClose = softClose;

@@ -38,7 +38,7 @@ public class StandardConnection extends ClosableConnection
     }
 
     @Override
-    void postOpen()
+    protected void postOpen()
     {
         super.postOpen();
         getController().needsRead(true);
@@ -46,21 +46,28 @@ public class StandardConnection extends ClosableConnection
     }
 
     @Override
-    void postWrite()
+    protected void postWrite()
     {
         super.postWrite();
         writer.writeReadyEvent();
     }
 
     @Override
-    void postWriteTimeout()
+    protected void postWriteTimeout()
     {
         super.postWriteTimeout();
         writer.writeTimeoutEvent();
     }
 
     @Override
-    void postClosing(StreamType type)
+    protected void postRemoteClose()
+    {
+        super.postRemoteClose();
+        close();
+    }
+
+    @Override
+    protected void postClosing(StreamType type)
     {
         super.postClosing(type);
         if (type == StreamType.OUTPUT || type == StreamType.INPUT_OUTPUT)
@@ -70,10 +77,11 @@ public class StandardConnection extends ClosableConnection
     /**
      * <p>Awaits the given {@code timeout} (in milliseconds) for this connection
      * to be opened.</p>
+     *
      * @param timeout the maximum time to wait for this connection to be opened
      * @return whether the connection opened within the given {@code timeout}
      * @throws InterruptedException if the thread waiting for the connection to
-     * open is interrupted by another thread
+     *                              open is interrupted by another thread
      */
     public boolean awaitOpened(long timeout) throws InterruptedException
     {
@@ -90,7 +98,7 @@ public class StandardConnection extends ClosableConnection
      * @param buffer the buffer to write
      * @return the number of bytes of the given buffer that have been written
      */
-    public final int write(ByteBuffer buffer)
+    public int write(ByteBuffer buffer)
     {
         return writer.write(buffer);
     }

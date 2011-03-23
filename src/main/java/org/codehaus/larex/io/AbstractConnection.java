@@ -24,7 +24,7 @@ import java.nio.ByteBuffer;
  */
 public abstract class AbstractConnection implements Connection
 {
-    public final void openEvent()
+    public void openEvent()
     {
         onOpen();
         postOpen();
@@ -37,11 +37,11 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postOpen()
+    protected void postOpen()
     {
     }
 
-    public final boolean readEvent(ByteBuffer buffer)
+    public boolean readEvent(ByteBuffer buffer)
     {
         return onRead(buffer);
     }
@@ -51,14 +51,14 @@ public abstract class AbstractConnection implements Connection
      * peer into the given {@code buffer}.</p>
      *
      * @param buffer the buffer containing the bytes read
-     * @return whether to set read interest
+     * @return whether to receive further read events
      */
     protected boolean onRead(ByteBuffer buffer)
     {
         return true;
     }
 
-    public final void readTimeoutEvent()
+    public void readTimeoutEvent()
     {
         onReadTimeout();
         postReadTimeout();
@@ -71,11 +71,11 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postReadTimeout()
+    protected void postReadTimeout()
     {
     }
 
-    public final void writeEvent()
+    public void writeEvent()
     {
         onWrite();
         postWrite();
@@ -89,11 +89,11 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postWrite()
+    protected void postWrite()
     {
     }
 
-    public final void writeTimeoutEvent()
+    public void writeTimeoutEvent()
     {
         onWriteTimeout();
         postWriteTimeout();
@@ -106,11 +106,11 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postWriteTimeout()
+    protected void postWriteTimeout()
     {
     }
 
-    public final void remoteCloseEvent()
+    public void remoteCloseEvent()
     {
         onRemoteClose();
         postRemoteClose();
@@ -124,11 +124,11 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postRemoteClose()
+    protected void postRemoteClose()
     {
     }
 
-    public final void closingEvent(StreamType type)
+    public void closingEvent(StreamType type)
     {
         onClosing(type);
         postClosing(type);
@@ -144,11 +144,11 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postClosing(StreamType type)
+    protected void postClosing(StreamType type)
     {
     }
 
-    public final void closedEvent(StreamType type)
+    public void closedEvent(StreamType type)
     {
         onClosed(type);
         postClosed(type);
@@ -164,7 +164,7 @@ public abstract class AbstractConnection implements Connection
     {
     }
 
-    void postClosed(StreamType type)
+    protected void postClosed(StreamType type)
     {
     }
 }

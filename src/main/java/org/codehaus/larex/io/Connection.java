@@ -42,7 +42,7 @@ public interface Connection
      * than the data available.</p>
      *
      * @param buffer the buffer containing the bytes read
-     * @return whether to set read interest to receive further read events
+     * @return whether to receive further read events
      */
     public boolean readEvent(ByteBuffer buffer);
 

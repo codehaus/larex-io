@@ -161,6 +161,14 @@ public class ServerConnector
         this.writeTimeout = writeTimeout;
     }
 
+    public InetSocketAddress getAddress()
+    {
+        InetSocketAddress address = (InetSocketAddress)serverChannel.socket().getLocalSocketAddress();
+        if (address == null)
+            address = this.address;
+        return address;
+    }
+
     public int listen() throws RuntimeIOException
     {
         try
@@ -189,7 +197,7 @@ public class ServerConnector
             this.acceptors[i] = thread;
         }
 
-        logger.info("ServerConnector {} listening on {}", this, serverChannel.socket().getLocalSocketAddress());
+        logger.info("{} listening on {}", this, serverChannel.socket().getLocalSocketAddress());
         return serverChannel.socket().getLocalPort();
     }
 
@@ -207,7 +215,7 @@ public class ServerConnector
 
     public void close()
     {
-        logger.debug("ServerConnector {} closing", this);
+        logger.debug("{} closing", this);
         try
         {
             for (Thread acceptor : acceptors)
@@ -217,7 +225,7 @@ public class ServerConnector
                 reactor.close();
 
             serverChannel.close();
-            logger.debug("ServerConnector {} closed", this);
+            logger.debug("{} closed", this);
         }
         catch (IOException x)
         {
@@ -255,17 +263,17 @@ public class ServerConnector
                 // we should avoid processing the connection
                 if (serverChannel.isOpen())
                 {
-                    logger.debug("ServerConnector {}, accepted socket {}", this, socketChannel);
+                    logger.debug("{}, accepted socket {}", this, socketChannel);
                     accepted(socketChannel);
                 }
             }
             catch (SocketTimeoutException x)
             {
-                logger.debug("ServerConnector {}, ignoring timeout during accept", this);
+                logger.debug("{}, ignoring timeout during accept", this);
             }
             catch (AsynchronousCloseException x)
             {
-                logger.debug("ServerConnector {} closed asynchronously", this);
+                logger.debug("{} closed", this);
                 break;
             }
             catch (IOException x)
@@ -326,14 +334,14 @@ public class ServerConnector
     {
         public void run()
         {
-            logger.debug("ServerConnector {}, acceptor loop entered", this);
+            logger.debug("{}, acceptor loop entered", this);
             try
             {
                 accept();
             }
             finally
             {
-                logger.debug("ServerConnector {}, acceptor loop exited", this);
+                logger.debug("{}, acceptor loop exited", this);
             }
         }
     }

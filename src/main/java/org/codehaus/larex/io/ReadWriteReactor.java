@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -34,7 +35,7 @@ public class ReadWriteReactor implements Reactor
 {
     private static final AtomicInteger ids = new AtomicInteger();
 
-    protected final Logger logger = LoggerFactory.getLogger(getClass());
+    protected final Logger logger = LoggerFactory.getLogger(Reactor.class);
     private final Queue<Runnable> tasks = new ConcurrentLinkedQueue<Runnable>();
     private volatile Selector selector;
     private volatile Thread thread;
@@ -116,7 +117,9 @@ public class ReadWriteReactor implements Reactor
 
     public void close()
     {
-        submit(new Close());
+        Close task = new Close();
+        submit(task);
+        task.await();
     }
 
     public boolean join(long timeout) throws InterruptedException
@@ -153,7 +156,11 @@ public class ReadWriteReactor implements Reactor
                 // will notice that the selection key was updated.
                 // This gives an good performance boost (benchmark with and without
                 // to believe it).
-                if (selected == 0)
+                // TODO: check if this optimization is still needed. Previously we were updating the interest ops from
+                // TODO: non-reactor threads, so it made sense to call selectNow() since the key was updated already
+                // TODO: but this proved to grab a lock with the selector, becoming a bottleneck, so now interest ops
+                // TODO: are updated with a task; if so, then we should not need this optimization
+                if (selected == 0 && tasks.isEmpty())
                 {
                     selected = selectNow();
                     if (debug)
@@ -262,20 +269,42 @@ public class ReadWriteReactor implements Reactor
 
     private class Close implements Runnable
     {
+        private final CountDownLatch latch = new CountDownLatch(1);
+
         public void run()
         {
-            for (SelectionKey key : selector.keys())
-            {
-                Listener listener = (Listener)key.attachment();
-                listener.onClose();
-            }
-
             try
             {
-                selector.close();
+                for (SelectionKey key : selector.keys())
+                {
+                    Listener listener = (Listener)key.attachment();
+                    listener.onClose();
+                }
+
+                try
+                {
+                    selector.close();
+                }
+                catch (IOException x)
+                {
+                    throw new RuntimeIOException(x);
+                }
             }
-            catch (IOException x)
+            finally
             {
+                latch.countDown();
+            }
+        }
+
+        public void await()
+        {
+            try
+            {
+                latch.await();
+            }
+            catch (InterruptedException x)
+            {
+                Thread.currentThread().interrupt();
                 throw new RuntimeIOException(x);
             }
         }

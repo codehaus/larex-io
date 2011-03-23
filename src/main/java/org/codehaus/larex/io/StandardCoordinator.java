@@ -249,11 +249,11 @@ public class StandardCoordinator implements Coordinator
                     logger.debug("Channel {} closed remotely", getChannel());
                 onRemoteClose();
             }
-            needsRead(false);
         }
         else
         {
-            needsRead(readMore);
+            if (readMore)
+                needsRead(true);
         }
     }
 
@@ -272,14 +272,7 @@ public class StandardCoordinator implements Coordinator
 
     protected void onRemoteClose()
     {
-        try
-        {
-            getInterceptor().onRemoteClose();
-        }
-        finally
-        {
-            close(StreamType.INPUT_OUTPUT);
-        }
+        getInterceptor().onRemoteClose();
     }
 
     protected boolean onRead(ByteBuffer buffer)

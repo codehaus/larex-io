@@ -17,6 +17,8 @@
 package org.codehaus.larex.io;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>Implementation of {@link Connection} that provides blocking read functionality,
@@ -37,6 +39,7 @@ import java.nio.ByteBuffer;
  */
 public class BlockingConnection extends ClosableConnection
 {
+    private final CountDownLatch opened = new CountDownLatch(1);
     private final BlockingReader reader;
     private final BlockingWriter writer;
 
@@ -47,13 +50,33 @@ public class BlockingConnection extends ClosableConnection
         this.writer = new BlockingWriter(controller);
     }
 
+    @Override
+    protected void postOpen()
+    {
+        super.postOpen();
+        opened.countDown();
+    }
+
+    /**
+     * <p>Awaits the given {@code timeout} (in milliseconds) for this connection
+     * to be opened.</p>
+     * @param timeout the maximum time to wait for this connection to be opened
+     * @return whether the connection opened within the given {@code timeout}
+     * @throws InterruptedException if the thread waiting for the connection to
+     * open is interrupted by another thread
+     */
+    public boolean awaitOpened(long timeout) throws InterruptedException
+    {
+        return opened.await(timeout, TimeUnit.MILLISECONDS);
+    }
+
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
      *
      * @param buffer the buffer containing the bytes to read
      */
     @Override
-    protected final boolean onRead(ByteBuffer buffer)
+    protected boolean onRead(ByteBuffer buffer)
     {
         return reader.readEvent(buffer);
     }
@@ -72,20 +95,20 @@ public class BlockingConnection extends ClosableConnection
     }
 
     @Override
-    void postWrite()
+    protected void postWrite()
     {
         super.postWrite();
         writer.writeReadyEvent();
     }
 
-    void postReadTimeout()
+    protected void postReadTimeout()
     {
         super.postReadTimeout();
         reader.readTimeoutEvent();
     }
 
     @Override
-    void postWriteTimeout()
+    protected void postWriteTimeout()
     {
         super.postWriteTimeout();
         writer.writeTimeoutEvent();
@@ -94,14 +117,14 @@ public class BlockingConnection extends ClosableConnection
     /**
      * <p>Overridden to implement the blocking read functionality.</p>
      */
-    void postRemoteClose()
+    protected void postRemoteClose()
     {
         super.postRemoteClose();
         reader.remoteCloseEvent();
     }
 
     @Override
-    void postClosing(StreamType type)
+    protected void postClosing(StreamType type)
     {
         super.postClosing(type);
         if (type == StreamType.INPUT || type == StreamType.INPUT_OUTPUT)
@@ -124,8 +147,20 @@ public class BlockingConnection extends ClosableConnection
      * @throws RuntimeSocketTimeoutException if the write timeout expires
      * @throws RuntimeSocketClosedException  if the connection is closed
      */
-    public final void write(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
+    public void write(ByteBuffer buffer) throws RuntimeSocketTimeoutException, RuntimeSocketClosedException
     {
         writer.write(buffer);
+    }
+
+    /**
+     * The factory that creates instances of {@link BlockingConnection}.
+     */
+    public static class Factory implements ConnectionFactory<BlockingConnection>
+    {
+        @Override
+        public BlockingConnection newConnection(Controller controller)
+        {
+            return new BlockingConnection(controller);
+        }
     }
 }

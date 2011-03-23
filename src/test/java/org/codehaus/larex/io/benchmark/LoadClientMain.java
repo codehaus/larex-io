@@ -39,7 +39,6 @@ import org.codehaus.larex.io.ConnectionFactory;
 import org.codehaus.larex.io.Controller;
 import org.codehaus.larex.io.StandardConnection;
 import org.codehaus.larex.io.connector.ClientConnector;
-import org.codehaus.larex.io.connector.Endpoint;
 
 public class LoadClientMain
 {
@@ -120,9 +119,9 @@ public class LoadClientMain
             int currentConnections = this.connections.size();
             while (currentConnections < connections)
             {
-                Endpoint<LatencyConnection> endpoint = connector.newEndpoint(connectionFactory);
-                endpoint.setBindAddress(new InetSocketAddress("192.168.0.3", 0));
-                LatencyConnection connection = endpoint.connect(address);
+                LatencyConnection connection = connector.buildConnection(connectionFactory)
+                        .bindAddress(new InetSocketAddress("192.168.0.3", 0))
+                        .connect(address);
                 if (connection.awaitOpened(1000))
                     this.connections.add(connection);
                 currentConnections = this.connections.size();

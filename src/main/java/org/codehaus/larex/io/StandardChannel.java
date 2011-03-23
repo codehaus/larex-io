@@ -30,8 +30,7 @@ import org.slf4j.LoggerFactory;
 
 public class StandardChannel implements Channel, Runnable
 {
-    private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final boolean debug = logger.isDebugEnabled();
+    private static final Logger logger = LoggerFactory.getLogger(Channel.class);
     private final Reactor reactor;
     private final SocketChannel channel;
     private final Controller controller;
@@ -39,6 +38,7 @@ public class StandardChannel implements Channel, Runnable
     private volatile int writeAggressiveness = 2;
     private volatile SelectionKey selectionKey;
     private volatile int interestOps;
+    private volatile boolean remoteClosed;
 
     public StandardChannel(Reactor reactor, SocketChannel channel, Controller controller)
     {
@@ -84,9 +84,23 @@ public class StandardChannel implements Channel, Runnable
             newOperations = oldOperations | operations;
         else
             newOperations = oldOperations & ~operations;
-        if (newOperations != oldOperations)
+
+        if (remoteClosed || isClosed(StreamType.INPUT))
+            newOperations &= ~SelectionKey.OP_READ;
+        if (isClosed(StreamType.OUTPUT))
+            newOperations &= ~SelectionKey.OP_WRITE;
+
+        boolean debug = logger.isDebugEnabled();
+        if (newOperations == oldOperations)
+        {
+            if (debug)
+                logger.debug("Channel {} skipped update operations {} -> {}", new Object[]{this, oldOperations, newOperations});
+        }
+        else
         {
             interestOps = newOperations;
+            if (debug)
+                logger.debug("Channel {} update operations {} -> {}", new Object[]{this, oldOperations, newOperations});
             reactor.submit(this);
         }
     }
@@ -94,6 +108,8 @@ public class StandardChannel implements Channel, Runnable
     @Override
     public void run()
     {
+        boolean debug = logger.isDebugEnabled();
+
         SelectionKey selectionKey = this.selectionKey;
         if (selectionKey == null)
         {
@@ -106,9 +122,17 @@ public class StandardChannel implements Channel, Runnable
         {
             int oldOperations = selectionKey.interestOps();
             int newOperations = interestOps;
-            selectionKey.interestOps(newOperations);
-            if (debug)
-                logger.debug("Channel {} operations {} -> {}", new Object[]{this, oldOperations, newOperations});
+            if (newOperations == oldOperations)
+            {
+                if (debug)
+                    logger.debug("Channel {} skipped set operations {} -> {}", new Object[]{this, oldOperations, newOperations});
+            }
+            else
+            {
+                selectionKey.interestOps(newOperations);
+                if (debug)
+                    logger.debug("Channel {} set operations {} -> {}", new Object[]{this, oldOperations, newOperations});
+            }
         }
         catch (CancelledKeyException x)
         {
@@ -119,9 +143,7 @@ public class StandardChannel implements Channel, Runnable
     @Override
     public boolean unregister(Selector selector, Reactor.Listener listener)
     {
-        Unregister task = new Unregister();
-        reactor.submit(task);
-        return task.result();
+        return true;
     }
 
     @Override
@@ -149,12 +171,19 @@ public class StandardChannel implements Channel, Runnable
         while (true)
         {
             int read = channel.read(buffer);
+
             if (!buffer.hasRemaining())
                 break;
+
             if (read < 0)
+            {
+                remoteClosed = !isClosed(StreamType.INPUT);
                 return true;
+            }
             else if (read > 0)
+            {
                 aggressiveness = getReadAggressiveness();
+            }
             else
             {
                 --aggressiveness;
@@ -180,7 +209,6 @@ public class StandardChannel implements Channel, Runnable
         }
         catch (IOException x)
         {
-            logger.debug("Unexpected IOException", x);
             controller.close(StreamType.INPUT_OUTPUT);
             throw new RuntimeIOException(x);
         }
@@ -230,8 +258,7 @@ public class StandardChannel implements Channel, Runnable
         if (isClosed(type))
             return;
 
-        if (debug)
-            logger.debug("Channel {} closing {}", this, type);
+        logger.debug("Channel {} closing {}", this, type);
 
         try
         {
@@ -320,44 +347,6 @@ public class StandardChannel implements Channel, Runnable
         }
     }
 
-    private class Unregister implements Runnable
-    {
-        private final CountDownLatch latch = new CountDownLatch(1);
-        private volatile boolean result;
-
-        @Override
-        public void run()
-        {
-            try
-            {
-                final SelectionKey selectionKey = StandardChannel.this.selectionKey;
-                if (selectionKey != null)
-                {
-                    selectionKey.cancel();
-                    result = true;
-                }
-            }
-            finally
-            {
-                latch.countDown();
-            }
-        }
-
-        public boolean result()
-        {
-            try
-            {
-                latch.await();
-                return result;
-            }
-            catch (InterruptedException x)
-            {
-                Thread.currentThread().interrupt();
-                throw new RuntimeIOException(x);
-            }
-        }
-    }
-
     private class Close implements Runnable
     {
         private final CountDownLatch latch = new CountDownLatch(1);
@@ -372,6 +361,7 @@ public class StandardChannel implements Channel, Runnable
                 if (selectionKey != null)
                 {
                     reactor.unregister(StandardChannel.this, (Reactor.Listener)selectionKey.attachment());
+                    selectionKey.cancel();
                     StandardChannel.this.selectionKey = null;
                 }
                 channel.close();

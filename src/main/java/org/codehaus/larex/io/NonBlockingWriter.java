@@ -144,6 +144,8 @@ public class NonBlockingWriter
      */
     public int write(ByteBuffer bytes)
     {
+        boolean debug = logger.isDebugEnabled();
+
         synchronized (this)
         {
             if (buffer != null)
@@ -166,9 +168,11 @@ public class NonBlockingWriter
                 }
             }
 
+            if (debug)
+                logger.debug("{} writing {} bytes", this, bytes.remaining());
             int written = write(controller, bytes);
             int remaining = bytes.remaining();
-            if (logger.isDebugEnabled())
+            if (debug)
                 logger.debug("{} wrote {} bytes, {} bytes left to write", new Object[]{this, written, remaining});
             if (remaining > 0)
             {

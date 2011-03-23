@@ -182,7 +182,7 @@ public class LoadServerMain
                 }
             }
             buffer.flip();
-            return super.onRead(buffer);
+            return true;
         }
 
         private static class StatisticsInterceptor extends Interceptor.Forwarder
@@ -191,8 +191,7 @@ public class LoadServerMain
             public boolean onRead(ByteBuffer buffer)
             {
                 reads.incrementAndGet();
-                super.onRead(buffer);
-                return false;
+                return super.onRead(buffer);
             }
 
             @Override

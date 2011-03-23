@@ -25,6 +25,7 @@ import java.util.concurrent.Executor;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -32,8 +33,11 @@ import org.codehaus.larex.io.ByteBuffers;
 import org.codehaus.larex.io.CachedByteBuffers;
 import org.codehaus.larex.io.Connection;
 import org.codehaus.larex.io.ConnectionFactory;
+import org.codehaus.larex.io.Controller;
+import org.codehaus.larex.io.Reactor;
 import org.codehaus.larex.io.RuntimeIOException;
 import org.codehaus.larex.io.connector.ClientConnector;
+import org.codehaus.larex.io.ssl.SSLInterceptor;
 
 public class SSLClientConnector extends ClientConnector
 {
@@ -73,9 +77,9 @@ public class SSLClientConnector extends ClientConnector
         return sslByteBuffers;
     }
 
-    public <C extends Connection> SSLEndpoint<C> newEndpoint(ConnectionFactory<C> connectionFactory)
+    public <C extends Connection> SSLConnectionBuilder<C, ?> buildConnection(ConnectionFactory<C> connectionFactory)
     {
-        return new SSLEndpoint<C>(connectionFactory, chooseReactor(), getByteBuffers(), getThreadPool(), getSSLContext(), getSSLByteBuffers());
+        return new Builder<C>(connectionFactory, chooseReactor());
     }
 
     public String getProtocolAlgorithm()
@@ -245,5 +249,46 @@ public class SSLClientConnector extends ClientConnector
         TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(getTrustStoreAlgorithm());
         trustManagerFactory.init(trustStore);
         return trustManagerFactory.getTrustManagers();
+    }
+
+    public abstract class SSLConnectionBuilder<C extends Connection, B extends SSLConnectionBuilder<C, B>> extends ConnectionBuilder<C, B>
+    {
+        private volatile SSLEngine sslEngine;
+
+        protected SSLConnectionBuilder(ConnectionFactory<C> factory, Reactor reactor)
+        {
+            super(factory, reactor);
+        }
+
+        protected C newConnection(Controller controller)
+        {
+            String host = socketChannel().socket().getInetAddress().getHostAddress();
+            int port = socketChannel().socket().getPort();
+            sslEngine = sslContext.createSSLEngine(host, port);
+            sslEngine.setUseClientMode(true);
+            controller.addInterceptor(new SSLInterceptor(getSSLByteBuffers(), sslEngine(), controller));
+            return super.newConnection(controller);
+        }
+
+        public SSLEngine sslEngine()
+        {
+            return sslEngine;
+        }
+
+        // TODO: add set[Need|Want]ClientAuth (and other SSLEngine methods. maybe ?)
+    }
+
+    private class Builder<C extends Connection> extends SSLConnectionBuilder<C, Builder<C>>
+    {
+        private Builder(ConnectionFactory<C> factory, Reactor reactor)
+        {
+            super(factory, reactor);
+        }
+
+        @Override
+        protected Builder<C> self()
+        {
+            return this;
+        }
     }
 }
